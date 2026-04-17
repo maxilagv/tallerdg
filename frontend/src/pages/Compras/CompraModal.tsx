@@ -1,0 +1,282 @@
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Minus, Plus, Search, Trash2 } from "lucide-react";
+import { comprasApi, type CreateCompraPayload } from "../../features/compras/api";
+import { productosApi } from "../../features/productos/api";
+import { proveedoresApi } from "../../features/proveedores/api";
+import { useDebounce } from "../../shared/hooks/useDebounce";
+import { Button } from "../../shared/ui/Button";
+import { Input } from "../../shared/ui/Input";
+import { Modal } from "../../shared/ui/Modal";
+import { useToast } from "../../shared/ui/Toast";
+import { getErrorMessage } from "../../shared/utils/errorMessage";
+import { formatMoney } from "../../shared/utils/format";
+
+interface ItemLocal {
+  producto_id: number;
+  producto_nombre: string;
+  codigo?: string | null;
+  unidad: string;
+  cantidad: number;
+  precio_unitario: number;
+}
+
+interface Props {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function CompraModal({ open, onClose, onSuccess }: Props) {
+  const { add } = useToast();
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [proveedorId, setProveedorId] = useState("");
+  const [notas, setNotas] = useState("");
+  const [searchProducto, setSearchProducto] = useState("");
+  const [items, setItems] = useState<ItemLocal[]>([]);
+  const debouncedSearch = useDebounce(searchProducto, 250);
+
+  const proveedoresQuery = useQuery({
+    queryKey: ["proveedores-select"],
+    queryFn: () => proveedoresApi.listar({ page: 1, limit: 200 }),
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const productosQuery = useQuery({
+    queryKey: ["productos-compra-search", debouncedSearch],
+    queryFn: () => productosApi.listar({ page: 1, limit: 30, q: debouncedSearch || undefined }),
+    enabled: open,
+  });
+
+  const proveedores = proveedoresQuery.data?.data.data.rows ?? [];
+  const productosResultado = productosQuery.data?.data.data.rows ?? [];
+
+  const agregarProducto = (p: any) => {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.producto_id === p.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.producto_id === p.id ? { ...i, cantidad: i.cantidad + 1 } : i
+        );
+      }
+      return [...prev, {
+        producto_id: p.id,
+        producto_nombre: p.nombre,
+        codigo: p.codigo,
+        unidad: p.unidad || "unidad",
+        cantidad: 1,
+        precio_unitario: Number(p.precio_costo) || 0,
+      }];
+    });
+    setSearchProducto("");
+  };
+
+  const quitarItem = (productoId: number) =>
+    setItems((prev) => prev.filter((i) => i.producto_id !== productoId));
+
+  const updateCantidad = (productoId: number, cantidad: number) => {
+    if (cantidad <= 0) return quitarItem(productoId);
+    setItems((prev) => prev.map((i) => i.producto_id === productoId ? { ...i, cantidad } : i));
+  };
+
+  const updatePrecio = (productoId: number, precio: number) =>
+    setItems((prev) => prev.map((i) => i.producto_id === productoId ? { ...i, precio_unitario: precio } : i));
+
+  const total = items.reduce((sum, i) => sum + i.cantidad * i.precio_unitario, 0);
+
+  const mutation = useMutation({
+    mutationFn: () => {
+      const payload: CreateCompraPayload = {
+        proveedor_id: proveedorId ? Number(proveedorId) : null,
+        fecha,
+        notas: notas || null,
+        items: items.map((i) => ({
+          producto_id:     i.producto_id,
+          cantidad:        i.cantidad,
+          precio_unitario: i.precio_unitario,
+        })),
+      };
+      return comprasApi.crear(payload);
+    },
+    onSuccess: () => {
+      add("Compra registrada. El stock fue actualizado automáticamente.");
+      resetForm();
+      onSuccess();
+      onClose();
+    },
+    onError: (error) => add(getErrorMessage(error), "error"),
+  });
+
+  const resetForm = () => {
+    setFecha(new Date().toISOString().slice(0, 10));
+    setProveedorId("");
+    setNotas("");
+    setSearchProducto("");
+    setItems([]);
+  };
+
+  const handleClose = () => { resetForm(); onClose(); };
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Registrar compra" size="xl">
+      <div className="space-y-5">
+        {/* Datos generales */}
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-muted">Proveedor</label>
+            <select
+              value={proveedorId}
+              onChange={(e) => setProveedorId(e.target.value)}
+              className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+            >
+              <option value="">Sin proveedor (compra directa)</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </div>
+          <Input
+            label="Fecha de compra"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
+        </div>
+
+        {/* Buscador de productos */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-text-muted">
+            Agregar productos a la compra
+          </label>
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              value={searchProducto}
+              onChange={(e) => setSearchProducto(e.target.value)}
+              placeholder="Buscar producto por nombre o código..."
+              className="w-full rounded-xl border border-border bg-surface-3 px-10 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+            />
+          </div>
+
+          {searchProducto && productosResultado.length > 0 && (
+            <div className="mt-1 rounded-xl border border-border bg-surface shadow-lg">
+              {productosResultado.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => agregarProducto(p)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-surface-2 transition first:rounded-t-xl last:rounded-b-xl border-b border-border/40 last:border-0"
+                >
+                  <div>
+                    <span className="font-medium text-text">{p.nombre}</span>
+                    {p.codigo && <span className="ml-2 text-xs text-text-muted">{p.codigo}</span>}
+                  </div>
+                  <span className="text-xs text-text-muted">
+                    Stock actual: {Number(p.stock_actual).toLocaleString("es-AR")} {p.unidad}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {searchProducto && !productosQuery.isLoading && productosResultado.length === 0 && (
+            <p className="mt-2 text-xs text-text-muted">No se encontraron productos con ese criterio.</p>
+          )}
+        </div>
+
+        {/* Lista de items agregados */}
+        {items.length > 0 && (
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="grid grid-cols-[1fr_100px_120px_32px] gap-2 border-b border-border bg-surface-2 px-3 py-2 text-xs uppercase text-text-muted">
+              <span>Producto</span>
+              <span className="text-center">Cantidad</span>
+              <span className="text-right">Precio costo</span>
+              <span />
+            </div>
+            {items.map((item) => (
+              <div
+                key={item.producto_id}
+                className="grid grid-cols-[1fr_100px_120px_32px] items-center gap-2 border-b border-border/40 px-3 py-2.5 last:border-0"
+              >
+                <div>
+                  <p className="text-sm font-medium text-text">{item.producto_nombre}</p>
+                  <p className="text-xs text-text-muted">
+                    Subtotal: {formatMoney(item.cantidad * item.precio_unitario)}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => updateCantidad(item.producto_id, item.cantidad - 1)}
+                    className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-3 text-text-muted hover:text-text transition"
+                  >
+                    <Minus size={12} />
+                  </button>
+                  <span className="w-8 text-center text-sm font-medium">{item.cantidad}</span>
+                  <button
+                    type="button"
+                    onClick={() => updateCantidad(item.producto_id, item.cantidad + 1)}
+                    className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-3 text-text-muted hover:text-text transition"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={item.precio_unitario}
+                  onChange={(e) => updatePrecio(item.producto_id, Number(e.target.value))}
+                  className="rounded-lg border border-border bg-surface-3 px-2 py-1 text-right text-sm text-text outline-none focus:border-primary w-full"
+                />
+                <button
+                  type="button"
+                  onClick={() => quitarItem(item.producto_id)}
+                  className="flex h-6 w-6 items-center justify-center text-text-muted hover:text-red-300 transition"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center justify-between bg-surface-2 px-4 py-3">
+              <span className="text-sm font-medium text-text-muted">
+                {items.length} producto(s)
+              </span>
+              <span className="text-base font-bold text-text">
+                Total: {formatMoney(total)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {items.length === 0 && (
+          <div className="rounded-xl border border-dashed border-border bg-surface-2 py-8 text-center text-sm text-text-muted">
+            Buscá y agregá los productos que compraste para actualizar el stock automáticamente.
+          </div>
+        )}
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text-muted">Notas (opcional)</label>
+          <textarea
+            rows={2}
+            value={notas}
+            onChange={(e) => setNotas(e.target.value)}
+            placeholder="Número de factura, observaciones, etc."
+            className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={handleClose}>Cancelar</Button>
+          <Button
+            onClick={() => mutation.mutate()}
+            loading={mutation.isPending}
+            disabled={items.length === 0}
+          >
+            Registrar compra y actualizar stock
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}

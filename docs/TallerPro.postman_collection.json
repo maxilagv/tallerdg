@@ -1,0 +1,391 @@
+{
+  "info": {
+    "_postman_id": "7d390b92-7c34-4e85-8cb6-7c72a841a1e2",
+    "name": "TallerPro API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Colección base para validar el flujo crítico de TallerPro antes de deploy."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001/api"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "clienteId",
+      "value": "1"
+    },
+    {
+      "key": "vehiculoId",
+      "value": "1"
+    },
+    {
+      "key": "ordenId",
+      "value": "1"
+    },
+    {
+      "key": "servicioItemId",
+      "value": "1"
+    },
+    {
+      "key": "productoItemId",
+      "value": "1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@tallerpro.com\",\n  \"password\": \"admin1234\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Refresh",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clientes",
+      "item": [
+        {
+          "name": "Listar clientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Crear cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Juan\",\n  \"apellido\": \"Pérez\",\n  \"telefono\": \"1122334455\",\n  \"email\": \"juan.perez@example.com\",\n  \"direccion\": \"Av. Siempre Viva 123\",\n  \"notas\": \"Cliente de prueba\"\n}"
+            },
+            "url": "{{baseUrl}}/clientes"
+          }
+        },
+        {
+          "name": "Obtener cliente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/clientes/{{clienteId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vehículos",
+      "item": [
+        {
+          "name": "Listar vehículos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehiculos?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Crear vehículo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cliente_id\": {{clienteId}},\n  \"patente\": \"AB123CD\",\n  \"marca\": \"Ford\",\n  \"modelo\": \"Focus\",\n  \"anio\": 2020,\n  \"color\": \"Gris\",\n  \"tipo_combustible\": \"nafta\",\n  \"numero_motor\": \"MOTOR-001\",\n  \"numero_chasis\": \"CHASIS-001\",\n  \"km_ultimo_service\": 35000,\n  \"observaciones\": \"Unidad de prueba\"\n}"
+            },
+            "url": "{{baseUrl}}/vehiculos"
+          }
+        },
+        {
+          "name": "Obtener historial de vehículo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/vehiculos/{{vehiculoId}}/historial"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Órdenes",
+      "item": [
+        {
+          "name": "Crear orden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cliente_id\": {{clienteId}},\n  \"vehiculo_id\": {{vehiculoId}},\n  \"km_entrada\": 42000,\n  \"notas_cliente\": \"Revisar ruidos en tren delantero\"\n}"
+            },
+            "url": "{{baseUrl}}/ordenes"
+          }
+        },
+        {
+          "name": "Agregar servicio a orden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicio_id\": 1,\n  \"descripcion\": \"Cambio de aceite y filtros\",\n  \"cantidad\": 1,\n  \"precio_unitario\": 25000\n}"
+            },
+            "url": "{{baseUrl}}/ordenes/{{ordenId}}/servicios"
+          }
+        },
+        {
+          "name": "Agregar producto a orden",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"producto_id\": 1,\n  \"descripcion\": \"Aceite 10W40 1L\",\n  \"cantidad\": 1,\n  \"precio_unitario\": 9000\n}"
+            },
+            "url": "{{baseUrl}}/ordenes/{{ordenId}}/productos"
+          }
+        },
+        {
+          "name": "Cambiar estado de orden",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"en_proceso\"\n}"
+            },
+            "url": "{{baseUrl}}/ordenes/{{ordenId}}/estado"
+          }
+        },
+        {
+          "name": "Cerrar orden",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"cerrada\"\n}"
+            },
+            "url": "{{baseUrl}}/ordenes/{{ordenId}}/estado"
+          }
+        },
+        {
+          "name": "Descargar remito PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/ordenes/{{ordenId}}/remito/pdf"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Búsqueda",
+      "item": [
+        {
+          "name": "Buscar por Ford",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/buscar?q=ford"
+          }
+        },
+        {
+          "name": "Buscar por patente",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/buscar?q=AB123"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Finanzas y Dashboard",
+      "item": [
+        {
+          "name": "Resumen financiero",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/finanzas/resumen?desde=2026-01-01&hasta=2026-03-31"
+          }
+        },
+        {
+          "name": "Finanzas por día",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/finanzas/por-dia?mes=3&anio=2026"
+          }
+        },
+        {
+          "name": "Dashboard de hoy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/dashboard/hoy"
+          }
+        }
+      ]
+    }
+  ]
+}

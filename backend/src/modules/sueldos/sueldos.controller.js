@@ -1,0 +1,49 @@
+const SueldosService = require("./sueldos.service");
+
+const SueldosController = {
+  async getResumen(req, res) {
+    const data = await SueldosService.getResumen();
+    return res.json({ ok: true, data });
+  },
+
+  async getConfig(req, res) {
+    const data = await SueldosService.getConfig(req.params.empleadoId);
+    return res.json({ ok: true, data: data || null });
+  },
+
+  async upsertConfig(req, res) {
+    const data = await SueldosService.upsertConfig(req.params.empleadoId, req.body);
+    return res.json({ ok: true, data });
+  },
+
+  async abrirPeriodo(req, res) {
+    const data = await SueldosService.abrirPeriodo(req.params.empleadoId, req.body);
+    return res.status(201).json({ ok: true, data });
+  },
+
+  async liquidar(req, res) {
+    const data = await SueldosService.liquidar(req.params.periodoId, req.body, req.empleado?.id);
+    return res.json({ ok: true, data });
+  },
+
+  async registrarAdelanto(req, res) {
+    const data = await SueldosService.registrarAdelanto(
+      req.params.periodoId,
+      req.body,
+      req.empleado?.id
+    );
+    return res.status(201).json({ ok: true, data });
+  },
+
+  async getHistorial(req, res) {
+    const data = await SueldosService.getHistorial(req.params.empleadoId, req.query);
+    return res.json({ ok: true, data });
+  },
+
+  async getPeriodosVencidos(req, res) {
+    const data = await SueldosService.getPeriodosVencidos();
+    return res.json({ ok: true, data });
+  },
+};
+
+module.exports = SueldosController;

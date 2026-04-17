@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"Trabajos\" \"C:\\\\Users\\\\User\\\\OneDrive\\\\Desktop\\\\tallerdg\\\\frontend\\\\src\" --include=\"*.tsx\" 2>/dev/null | cut -d: -f1 | sort -u)",
+      "Bash(find \"C:\\\\Users\\\\User\\\\OneDrive\\\\Desktop\\\\tallerdg\\\\frontend\\\\src\" -path \"*/node_modules\" -prune -o -type f -name \"*.tsx\" -print | xargs grep -l \"s/d\\\\|s\\\\.d\\\\|sin dato\\\\|Sin dato\" 2>/dev/null | head -10)",
+      "Bash(cd \"C:\\\\Users\\\\User\\\\OneDrive\\\\Desktop\\\\tallerdg\\\\backend\" && npm run migrate 2>&1)",
+      "Bash(find /c/Users/User/OneDrive/Desktop/gomeria-taller -type f \\\\\\( -name \"*whatsapp*\" -o -name \"*notification*\" \\\\\\) 2>/dev/null | grep -v node_modules | grep -v \".wwebjs_auth\")",
+      "Bash(find /c/Users/User/OneDrive/Desktop/gomeria-taller/frontend/src -name \"*notificacion*\" -o -name \"*ordenes*\" -o -name \"*whatsapp*\" 2>/dev/null | grep -v node_modules)",
+      "Bash(find \"C:\\\\Users\\\\User\\\\OneDrive\\\\Desktop\\\\gomeria-taller\\\\backend\\\\server\\\\src\" -path \"*/cron/*\" -o -path \"*/jobs/*\" | grep -E \"\\\\.\\(js|ts\\)$\" | head -10)",
+      "Bash(grep -l \"client_direct_messages\" /c/Users/User/OneDrive/Desktop/gomeria-taller/backend/server/src/db/migrations/*.sql)",
+      "Bash(cd \"C:/Users/User/OneDrive/Desktop/gomeria-taller/backend/server/src\" && node -e \"require\\('./modules/ofertas/ofertas.service.js'\\)\" 2>&1 && echo \"OK: service\" || echo \"FAIL: service\"\nnode -e \"require\\('./modules/ofertas/ofertas.repository.js'\\)\" 2>&1 && echo \"OK: repository\" || echo \"FAIL: repository\"\nnode -e \"require\\('./modules/ofertas/ofertas.controller.js'\\)\" 2>&1 && echo \"OK: controller\" || echo \"FAIL: controller\"\nnode -e \"require\\('./modules/ofertas/ofertas.routes.js'\\)\" 2>&1 && echo \"OK: routes\" || echo \"FAIL: routes\"\nnode -e \"require\\('./routes.js'\\)\" 2>&1 && echo \"OK: routes.js\" || echo \"FAIL: routes.js\")",
+      "Bash(cd \"C:/Users/User/OneDrive/Desktop/gomeria-taller/frontend\" && npx tsc --noEmit 2>&1 | head -60)",
+      "Bash(cd \"C:/Users/User/OneDrive/Desktop/gomeria-taller/frontend\" && npx tsc --noEmit 2>&1 | grep \"OfertasPage\\\\|ofertas/api\")",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Bash(node -e \"require\\(''./src/shared/db/migrations/028_create_cuenta_corriente_proveedores.js''\\); console.log\\(''OK''\\)\")",
+      "Bash(node -e \"require\\(''./src/modules/proveedores/proveedores.service.js''\\); console.log\\(''OK''\\)\")",
+      "Bash(node -e \"require\\(''./src/modules/compras/compras.repository.js''\\); console.log\\(''OK''\\)\")",
+      "Bash(node -e \"require\\(''./src/modules/proveedores/proveedores.routes.js''\\); console.log\\(''OK''\\)\")",
+      "Bash(npx knex:*)",
+      "Bash(node -e \":*)",
+      "Bash(node -e \"require\\(''exceljs''\\); console.log\\(''ExcelJS OK''\\)\")",
+      "Bash(node -e \"const knex = require\\('./src/shared/db/knex'\\); knex.migrate.latest\\(\\).then\\(\\([batch, files]\\) => { console.log\\('Migradas:', files\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\")"
+    ]
+  }
+}
