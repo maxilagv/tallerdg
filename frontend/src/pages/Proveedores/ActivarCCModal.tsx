@@ -26,7 +26,7 @@ export function ActivarCCModal({ open, onClose, proveedor, onSuccess }: Props) {
   const { add } = useToast();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: { saldo_inicial: 0 },
   });
 
@@ -49,7 +49,7 @@ export function ActivarCCModal({ open, onClose, proveedor, onSuccess }: Props) {
       title={`Activar cuenta corriente — ${proveedor.nombre}`}
       size="sm"
     >
-      <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+      <form onSubmit={handleSubmit((v) => mutation.mutate(v as FormData))} className="space-y-4">
         <p className="text-sm text-text-muted">
           Al activar la cuenta corriente, cada compra que registres a este
           proveedor generará automáticamente una deuda. Podés cargar un saldo

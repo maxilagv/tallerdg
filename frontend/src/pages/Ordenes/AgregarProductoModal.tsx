@@ -95,7 +95,6 @@ export function AgregarProductoModal({ open, ordenId, onClose, onSuccess }: Agre
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
 
-  const cartByKey = (key: string) => cart.find((c) => c.key === key) ?? null;
   const cartByProductoId = (id: number) => cart.find((c) => c.producto_id === id) ?? null;
 
   const addCatalogToCart = (producto: Producto) => {

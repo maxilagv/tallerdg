@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -28,7 +28,7 @@ const schema = z.object({
   color: z.string().optional(),
   tipo_combustible: z.string().optional(),
   km_actual: z.string().optional(),
-  crear_orden: z.boolean().default(true),
+  crear_orden: z.boolean().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -79,7 +79,6 @@ export function RegistroExpressModal({
     handleSubmit,
     reset,
     watch,
-    setValue,
     setFocus,
     formState: { errors },
   } = useForm<FormData>({
@@ -212,7 +211,7 @@ export function RegistroExpressModal({
   return (
     <Modal open={open} onClose={onClose} title="Ingreso rápido" size="xl">
       <form
-        onSubmit={handleSubmit((values) => mutation.mutate(values))}
+        onSubmit={handleSubmit((values) => mutation.mutate(values as FormData))}
         className="space-y-5"
       >
         {/* ── Columnas: cliente | vehículo ── */}

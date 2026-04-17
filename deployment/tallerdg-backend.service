@@ -1,0 +1,15 @@
+[Unit]
+Description=TallerDG Backend
+After=network.target mariadb.service
+Wants=mariadb.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/taller/tallerdg
+ExecStart=/usr/bin/node src/app.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

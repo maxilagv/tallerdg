@@ -44,7 +44,7 @@ export function PagoProveedorModal({
     reset,
     formState: { errors },
   } = useForm<FormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as any,
     defaultValues: { monto: undefined, descripcion: "" },
   });
 
@@ -68,7 +68,7 @@ export function PagoProveedorModal({
       size="sm"
     >
       <form
-        onSubmit={handleSubmit((v) => mutation.mutate(v))}
+        onSubmit={handleSubmit((v) => mutation.mutate(v as FormData))}
         className="space-y-4"
       >
         {/* Saldo actual */}

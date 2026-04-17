@@ -75,20 +75,13 @@ export function FinanzasCharts({ porDia, gastosPorCategoria }: FinanzasChartsPro
     .map((item) => ({ nombre: item.categoria, valor: Number(item.total) }))
     .filter((item) => item.valor > 0);
 
-  const customTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: { dataKey: string; value: number; fill?: string; stroke?: string; color?: string }[];
-    label?: string;
-  }) => {
+  const customTooltip = (props: any) => {
+    const { active, payload, label } = props;
     if (!active || !payload?.length) return null;
     return (
       <div className="rounded-lg border border-border bg-surface px-3 py-2 text-xs shadow-lg">
-        <p className="mb-1.5 font-semibold text-text">{label}</p>
-        {payload.map((item, i) => {
+        <p className="mb-1.5 font-semibold text-text">{String(label)}</p>
+        {payload.map((item: any, i: number) => {
           const labels: Record<string, string> = {
             ingresos: "Ingresos",
             gastos:   "Gastos",
