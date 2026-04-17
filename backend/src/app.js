@@ -38,10 +38,22 @@ const { iniciarCrons } = require("./shared/cron/cron.jobs");
 
 const app = express();
 
+function corsOrigin(origin, callback) {
+  if (!origin) {
+    return callback(null, true);
+  }
+
+  if (config.frontendUrls.includes(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error("Origen no permitido por CORS"));
+}
+
 app.use(helmet());
 app.use(
   cors({
-    origin: config.frontendUrl,
+    origin: corsOrigin,
     credentials: true,
   })
 );
