@@ -11,6 +11,7 @@ router.use(authMiddleware);
 
 router.get("/", requirePermiso("configuracion", "r"), OfertasController.listar);
 router.post("/", requirePermiso("configuracion", "w"), upload.single("imagen"), OfertasController.crear);
+router.put("/:id", requirePermiso("configuracion", "w"), upload.single("imagen"), OfertasController.actualizar);
 router.delete("/:id", requirePermiso("configuracion", "w"), OfertasController.eliminar);
 router.post("/:id/enviar", requirePermiso("configuracion", "w"), OfertasController.enviar);
 

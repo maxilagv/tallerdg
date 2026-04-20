@@ -119,6 +119,16 @@ const VentasRapidasRepository = {
     const items = await db("venta_rapida_items").where({ venta_id: id });
     return { ...venta, items };
   },
+
+  async saldoCajaHoy() {
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await db("ventas_rapidas")
+      .where("medio_pago", "efectivo")
+      .where("fecha", today)
+      .sum("total as total")
+      .first();
+    return { total: Number(result?.total ?? 0) };
+  },
 };
 
 module.exports = VentasRapidasRepository;

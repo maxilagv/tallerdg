@@ -57,6 +57,9 @@ export const ventasRapidasApi = {
   obtener: (id: number) =>
     api.get<{ ok: boolean; data: VentaRapida }>(`/ventas-rapidas/${id}`),
 
+  saldoCajaHoy: () =>
+    api.get<{ ok: boolean; data: { total: number } }>("/ventas-rapidas/saldo-caja-hoy"),
+
   crear: (payload: CreateVentaRapidaPayload) =>
     api.post<{ ok: boolean; data: VentaRapida }>("/ventas-rapidas", payload),
 };

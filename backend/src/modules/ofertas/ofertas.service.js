@@ -12,6 +12,13 @@ const crearSchema = z.object({
   programada_para: z.string().trim().optional().nullable(),
 });
 
+const actualizarSchema = z.object({
+  titulo: z.string().trim().min(1, "El título es obligatorio").optional(),
+  mensaje: z.string().trim().min(1, "El mensaje es obligatorio").optional(),
+  programada_para: z.string().trim().optional().nullable(),
+  eliminar_imagen: z.string().optional(),
+});
+
 const OfertasService = {
   async listar(query = {}) {
     const page = Math.max(1, Number(query.page) || 1);
@@ -41,6 +48,53 @@ const OfertasService = {
       imagen_public_id,
       programada_para: parsed.data.programada_para || null,
       creado_por: empleadoId || null,
+    });
+  },
+
+  async actualizar(id, body, file) {
+    const ofertaId = Number(id);
+    if (!Number.isInteger(ofertaId) || ofertaId <= 0) {
+      throw new AppError("Identificador inválido.", 400, "VALIDATION_ERROR");
+    }
+
+    const oferta = await OfertasRepository.findById(ofertaId);
+    if (!oferta) {
+      throw new AppError("Oferta no encontrada.", 404, "NOT_FOUND");
+    }
+
+    const parsed = actualizarSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0]?.message || "Datos inválidos.", 400, "VALIDATION_ERROR");
+    }
+
+    let imagen_url = oferta.imagen_url;
+    let imagen_public_id = oferta.imagen_public_id;
+
+    if (file) {
+      if (oferta.imagen_public_id) {
+        deleteImage(oferta.imagen_public_id).catch((error) => {
+          logger.warn({ error: error.message }, "No se pudo eliminar imagen anterior de Cloudinary");
+        });
+      }
+      const result = await uploadBuffer(file.buffer, { folder: "tallerpro/ofertas" });
+      imagen_url = result.secure_url;
+      imagen_public_id = result.public_id;
+    } else if (parsed.data.eliminar_imagen === "true") {
+      if (oferta.imagen_public_id) {
+        deleteImage(oferta.imagen_public_id).catch((error) => {
+          logger.warn({ error: error.message }, "No se pudo eliminar imagen de Cloudinary");
+        });
+      }
+      imagen_url = null;
+      imagen_public_id = null;
+    }
+
+    const { eliminar_imagen: _drop, ...updateFields } = parsed.data;
+
+    return OfertasRepository.actualizar(ofertaId, {
+      ...updateFields,
+      imagen_url,
+      imagen_public_id,
     });
   },
 

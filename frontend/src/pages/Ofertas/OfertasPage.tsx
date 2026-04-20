@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImagePlus, Megaphone, Plus, Send, Trash2, X } from "lucide-react";
+import { ImagePlus, Megaphone, Pencil, Plus, Send, Trash2, X } from "lucide-react";
 import { ofertasApi, type Oferta } from "../../features/ofertas/api";
 import { Badge } from "../../shared/ui/Badge";
 import { Button } from "../../shared/ui/Button";
@@ -22,11 +22,13 @@ export function OfertasPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showForm, setShowForm] = useState(false);
+  const [editingOferta, setEditingOferta] = useState<Oferta | null>(null);
   const [titulo, setTitulo] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [programadaPara, setProgramadaPara] = useState("");
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [imagenPreview, setImagenPreview] = useState<string | null>(null);
+  const [eliminarImagen, setEliminarImagen] = useState(false);
 
   const listQuery = useQuery({
     queryKey: ["ofertas"],
@@ -44,6 +46,24 @@ export function OfertasPage() {
     },
     onSuccess: () => {
       add("Oferta creada correctamente.");
+      queryClient.invalidateQueries({ queryKey: ["ofertas"] });
+      resetForm();
+    },
+    onError: (error) => add(getErrorMessage(error), "error"),
+  });
+
+  const editarMutation = useMutation({
+    mutationFn: (id: number) => {
+      const fd = new FormData();
+      fd.append("titulo", titulo.trim());
+      fd.append("mensaje", mensaje.trim());
+      if (programadaPara) fd.append("programada_para", programadaPara);
+      if (imagenFile) fd.append("imagen", imagenFile);
+      if (eliminarImagen) fd.append("eliminar_imagen", "true");
+      return ofertasApi.actualizar(id, fd);
+    },
+    onSuccess: () => {
+      add("Oferta actualizada correctamente.");
       queryClient.invalidateQueries({ queryKey: ["ofertas"] });
       resetForm();
     },
@@ -74,7 +94,24 @@ export function OfertasPage() {
     setProgramadaPara("");
     setImagenFile(null);
     setImagenPreview(null);
+    setEliminarImagen(false);
+    setEditingOferta(null);
     setShowForm(false);
+  }
+
+  function handleEditar(oferta: Oferta) {
+    setEditingOferta(oferta);
+    setTitulo(oferta.titulo);
+    setMensaje(oferta.mensaje);
+    setProgramadaPara(
+      oferta.programada_para
+        ? oferta.programada_para.slice(0, 16).replace(" ", "T")
+        : ""
+    );
+    setImagenFile(null);
+    setImagenPreview(oferta.imagen_url);
+    setEliminarImagen(false);
+    setShowForm(true);
   }
 
   function handleImagenChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -87,9 +124,25 @@ export function OfertasPage() {
     }
 
     setImagenFile(file);
+    setEliminarImagen(false);
     const reader = new FileReader();
     reader.onload = (e) => setImagenPreview(e.target?.result as string);
     reader.readAsDataURL(file);
+  }
+
+  function handleQuitarImagen() {
+    setImagenFile(null);
+    setImagenPreview(null);
+    setEliminarImagen(true);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleSubmitForm() {
+    if (editingOferta) {
+      editarMutation.mutate(editingOferta.id);
+    } else {
+      crearMutation.mutate();
+    }
   }
 
   async function handleEliminar(oferta: Oferta) {
@@ -111,6 +164,7 @@ export function OfertasPage() {
     if (ok) enviarMutation.mutate(oferta.id);
   }
 
+  const isPending = editingOferta ? editarMutation.isPending : crearMutation.isPending;
   const ofertas = listQuery.data?.data.data.rows ?? [];
 
   return (
@@ -132,7 +186,9 @@ export function OfertasPage() {
       {showForm && (
         <Card>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold text-text">Nueva oferta</h2>
+            <h2 className="font-semibold text-text">
+              {editingOferta ? "Editar oferta" : "Nueva oferta"}
+            </h2>
             <button onClick={resetForm} className="text-text-muted transition hover:text-text">
               <X size={18} />
             </button>
@@ -177,11 +233,7 @@ export function OfertasPage() {
                     className="h-40 w-auto rounded-xl border border-border object-cover"
                   />
                   <button
-                    onClick={() => {
-                      setImagenFile(null);
-                      setImagenPreview(null);
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
+                    onClick={handleQuitarImagen}
                     className="absolute -right-2 -top-2 rounded-full bg-surface-3 p-1 text-text-muted transition hover:text-red-400"
                   >
                     <X size={14} />
@@ -224,11 +276,11 @@ export function OfertasPage() {
                 Cancelar
               </Button>
               <Button
-                onClick={() => crearMutation.mutate()}
-                loading={crearMutation.isPending}
+                onClick={handleSubmitForm}
+                loading={isPending}
                 disabled={!titulo.trim() || !mensaje.trim()}
               >
-                Guardar oferta
+                {editingOferta ? "Guardar cambios" : "Guardar oferta"}
               </Button>
             </div>
           </div>
@@ -253,6 +305,7 @@ export function OfertasPage() {
               <OfertaRow
                 key={oferta.id}
                 oferta={oferta}
+                onEditar={handleEditar}
                 onEnviar={handleEnviar}
                 onEliminar={handleEliminar}
                 enviando={enviarMutation.isPending && enviarMutation.variables === oferta.id}
@@ -278,12 +331,14 @@ export function OfertasPage() {
 
 function OfertaRow({
   oferta,
+  onEditar,
   onEnviar,
   onEliminar,
   enviando,
   eliminando,
 }: {
   oferta: Oferta;
+  onEditar: (o: Oferta) => void;
   onEnviar: (o: Oferta) => void;
   onEliminar: (o: Oferta) => void;
   enviando: boolean;
@@ -328,6 +383,9 @@ function OfertaRow({
             <Send size={14} /> Enviar ahora
           </Button>
         )}
+        <Button size="sm" variant="ghost" onClick={() => onEditar(oferta)}>
+          <Pencil size={14} />
+        </Button>
         <Button
           size="sm"
           variant="danger"

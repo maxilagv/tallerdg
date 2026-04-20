@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { ScanBarcode } from "lucide-react";
 import { z } from "zod";
 import { categoriasApi } from "../../features/categorias/api";
 import { productosApi, type Producto } from "../../features/productos/api";
@@ -62,10 +63,16 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
     register,
     handleSubmit,
     reset,
+    setValue,
+    setFocus,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
+
+  const codigoFieldRef = useRef<HTMLInputElement | null>(null);
+  const codigoRegister = register("codigo");
+  const nombreRegister = register("nombre");
 
   useEffect(() => {
     if (editing) {
@@ -100,6 +107,72 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
     });
   }, [editing, reset, open]);
 
+  // Auto-focus the barcode field on open (new product) so the scanner lands on it.
+  useEffect(() => {
+    if (!open || editing) return;
+    const timer = setTimeout(() => codigoFieldRef.current?.focus(), 120);
+    return () => clearTimeout(timer);
+  }, [open, editing]);
+
+  // Global barcode-scanner detection: if a fast keystroke burst lands anywhere
+  // in the modal, we still capture it into the codigo field. This protects the
+  // flow when focus has drifted to a different field.
+  useEffect(() => {
+    if (!open) return;
+
+    const FAST_KEY_MAX_MS = 40;
+    const MIN_BARCODE_LENGTH = 4;
+    let buffer = "";
+    let lastKeyTime = 0;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      const delta = now - lastKeyTime;
+
+      if (e.key === "Enter") {
+        if (buffer.length >= MIN_BARCODE_LENGTH) {
+          e.preventDefault();
+          e.stopPropagation();
+          const scanned = buffer;
+          setValue("codigo", scanned, { shouldDirty: true, shouldValidate: false });
+          // Limpiar el campo donde cayeron los caracteres si no es codigo.
+          const target = e.target as HTMLInputElement | HTMLTextAreaElement | null;
+          if (target && "value" in target && codigoFieldRef.current && target !== codigoFieldRef.current) {
+            const currentValue = String(target.value || "");
+            if (currentValue.endsWith(scanned)) {
+              const cleaned = currentValue.slice(0, currentValue.length - scanned.length);
+              const setter = Object.getOwnPropertyDescriptor(
+                target instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,
+                "value"
+              )?.set;
+              setter?.call(target, cleaned);
+              target.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          }
+          try { codigoFieldRef.current?.focus(); } catch { /* noop */ }
+        }
+        buffer = "";
+        lastKeyTime = 0;
+        return;
+      }
+
+      if (e.key.length !== 1) {
+        buffer = "";
+        lastKeyTime = 0;
+        return;
+      }
+
+      if (delta > FAST_KEY_MAX_MS && buffer.length > 0) {
+        buffer = "";
+      }
+      buffer += e.key;
+      lastKeyTime = now;
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [open, setValue]);
+
   const mutation = useMutation({
     mutationFn: (values: FormData) => {
       const payload = {
@@ -133,6 +206,32 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
   return (
     <Modal open={open} onClose={onClose} title={isEditing ? "Editar producto" : "Nuevo producto"} size="xl">
       <form onSubmit={handleSubmit((values) => mutation.mutate(values))} className="space-y-5">
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
+          <label className="flex items-center gap-2 text-sm font-medium text-text">
+            <ScanBarcode size={18} className="text-primary" />
+            Código de barras
+          </label>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Escaneá con el lector o ingresá el código manualmente. Presioná Enter para avanzar al siguiente campo.
+          </p>
+          <input
+            placeholder="0000000000000"
+            autoComplete="off"
+            className="mt-2 w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+            {...codigoRegister}
+            ref={(el) => {
+              codigoRegister.ref(el);
+              codigoFieldRef.current = el;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setFocus("nombre");
+              }
+            }}
+          />
+        </div>
+
         <div className="grid gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-muted">Categoría</label>
@@ -168,9 +267,8 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <Input label="Nombre" error={errors.nombre?.message} {...register("nombre")} />
-          <Input label="Código" {...register("codigo")} />
+        <div className="grid gap-3 md:grid-cols-2">
+          <Input label="Nombre" error={errors.nombre?.message} {...nombreRegister} />
           <Input label="Marca" {...register("marca")} />
         </div>
 

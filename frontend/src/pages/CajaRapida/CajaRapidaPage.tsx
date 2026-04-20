@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
   CreditCard,
@@ -39,6 +39,7 @@ const MEDIOS_PAGO: { value: MedioPago; label: string; icon: React.ReactNode }[] 
 
 export function CajaRapidaPage() {
   const { add } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [medioPago, setMedioPago] = useState<MedioPago>("efectivo");
@@ -46,6 +47,12 @@ export function CajaRapidaPage() {
   const [ventaOk, setVentaOk] = useState(false);
 
   const debouncedSearch = useDebounce(search, 250);
+
+  const saldoQuery = useQuery({
+    queryKey: ["caja-saldo-hoy"],
+    queryFn: () => ventasRapidasApi.saldoCajaHoy(),
+    refetchInterval: 30_000,
+  });
 
   const productosQuery = useQuery({
     queryKey: ["caja-rapida-productos", debouncedSearch],
@@ -125,6 +132,7 @@ export function CajaRapidaPage() {
     },
     onSuccess: () => {
       setVentaOk(true);
+      queryClient.invalidateQueries({ queryKey: ["caja-saldo-hoy"] });
       setTimeout(() => {
         setCarrito([]);
         setNotas("");
@@ -136,16 +144,25 @@ export function CajaRapidaPage() {
   });
 
   const canConfirm = carrito.length > 0 && !mutation.isPending;
+  const saldoHoy = saldoQuery.data?.data.data.total ?? 0;
 
   return (
     <div className="flex h-full flex-col gap-5 lg:flex-row">
       {/* ── Panel izquierdo: búsqueda y productos ── */}
       <div className="flex flex-1 flex-col gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Caja Rápida</h1>
-          <p className="mt-1 text-sm text-text-muted">
-            Vendé productos al instante sin necesitar una orden de trabajo.
-          </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-text">Caja Rápida</h1>
+            <p className="mt-1 text-sm text-text-muted">
+              Vendé productos al instante sin necesitar una orden de trabajo.
+            </p>
+          </div>
+          <div className="shrink-0 rounded-2xl border border-border bg-surface px-4 py-3 text-right">
+            <p className="text-xs font-medium uppercase text-text-muted">Efectivo hoy</p>
+            <p className="mt-0.5 text-xl font-bold text-text">
+              {saldoQuery.isLoading ? "..." : formatMoney(saldoHoy)}
+            </p>
+          </div>
         </div>
 
         {/* Buscador */}

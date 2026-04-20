@@ -28,6 +28,11 @@ export const ofertasApi = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  actualizar: (id: number, formData: FormData) =>
+    api.put<{ ok: boolean; data: Oferta; message: string }>(`/ofertas/${id}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+
   eliminar: (id: number) =>
     api.delete<{ ok: boolean; message: string }>(`/ofertas/${id}`),
 

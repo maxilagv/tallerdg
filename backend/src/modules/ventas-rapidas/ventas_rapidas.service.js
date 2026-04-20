@@ -28,6 +28,10 @@ const VentasRapidasService = {
     return venta;
   },
 
+  async saldoCajaHoy() {
+    return VentasRapidasRepository.saldoCajaHoy();
+  },
+
   async crear(data, empleadoId) {
     const parsed = createVentaRapidaSchema.safeParse(data);
     if (!parsed.success) {

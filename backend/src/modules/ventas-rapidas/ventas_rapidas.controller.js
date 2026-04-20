@@ -11,6 +11,11 @@ const VentasRapidasController = {
     return res.json({ ok: true, data });
   },
 
+  async saldoCajaHoy(req, res) {
+    const data = await VentasRapidasService.saldoCajaHoy();
+    return res.json({ ok: true, data });
+  },
+
   async crear(req, res) {
     const data = await VentasRapidasService.crear(req.body, req.empleado?.id);
     return res.status(201).json({ ok: true, data });

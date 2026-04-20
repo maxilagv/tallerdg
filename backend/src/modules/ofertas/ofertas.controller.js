@@ -19,6 +19,15 @@ const OfertasController = {
     }
   },
 
+  async actualizar(req, res, next) {
+    try {
+      const oferta = await OfertasService.actualizar(req.params.id, req.body, req.file);
+      res.json({ ok: true, data: oferta, message: "Oferta actualizada." });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async eliminar(req, res, next) {
     try {
       await OfertasService.eliminar(req.params.id);
