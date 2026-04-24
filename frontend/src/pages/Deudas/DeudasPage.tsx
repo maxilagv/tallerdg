@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ChevronDown, ChevronUp, Plus, Trash2, Wallet, Wrench } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, MessageCircle, Plus, Trash2, Wallet, Wrench } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { deudasApi, type Deuda } from "../../features/deudas/api";
 import { useAuthStore } from "../../shared/store/authStore";
@@ -29,10 +29,11 @@ const estadoLabel: Record<Deuda["estado"], string> = {
   pagada: "Pagada",
 };
 
-function ClienteDeudaRow({ clienteId, nombre, apellido, cantidadDeudas, totalDeuda, canWrite }: {
+function ClienteDeudaRow({ clienteId, nombre, apellido, telefono, cantidadDeudas, totalDeuda, canWrite }: {
   clienteId: number;
   nombre: string;
   apellido: string;
+  telefono?: string | null;
   cantidadDeudas: number;
   totalDeuda: number;
   canWrite: boolean;
@@ -60,6 +61,15 @@ function ClienteDeudaRow({ clienteId, nombre, apellido, cantidadDeudas, totalDeu
     onError: (err) => add(getErrorMessage(err), "error"),
   });
 
+  const recordatorioMutation = useMutation({
+    mutationFn: () => deudasApi.enviarRecordatorio(clienteId),
+    onSuccess: () => {
+      add("Recordatorio de deuda enviado.");
+      queryClient.invalidateQueries({ queryKey: ["whatsapp-log"] });
+    },
+    onError: (err) => add(getErrorMessage(err), "error"),
+  });
+
   const deudas = deudasQuery.data?.data.data.rows ?? [];
 
   const handleEliminar = async (d: Deuda) => {
@@ -79,34 +89,56 @@ function ClienteDeudaRow({ clienteId, nombre, apellido, cantidadDeudas, totalDeu
       <AbonarDeudaModal deuda={abonarDeuda} open={Boolean(abonarDeuda)} onClose={() => setAbonarDeuda(null)} />
 
       <div className="rounded-xl border border-border bg-surface-2">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-surface-3"
-        >
-          <div className="flex items-center gap-3">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-3 transition hover:bg-surface-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex min-w-0 flex-1 items-center gap-3 text-left"
+          >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-500/15">
               <span className="text-sm font-bold text-red-400">{apellido[0]}</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="font-medium text-text">{apellido}, {nombre}</p>
               <p className="text-xs text-text-muted">
                 {cantidadDeudas} deuda{cantidadDeudas !== 1 ? "s" : ""} ·{" "}
                 <span className="text-red-400 font-semibold">{formatMoney(totalDeuda)}</span> pendientes
               </p>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-2">
             <Link
               to={`/clientes/${clienteId}`}
-              onClick={(e) => e.stopPropagation()}
               className="text-xs text-primary transition hover:underline"
             >
               Ver cliente
             </Link>
-            {expanded ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+            {canWrite && (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                loading={recordatorioMutation.isPending}
+                disabled={!telefono}
+                title={telefono ? "Enviar recordatorio de deuda por WhatsApp" : "El cliente no tiene telefono"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  recordatorioMutation.mutate();
+                }}
+              >
+                <MessageCircle size={14} />
+                WhatsApp
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="rounded-lg p-1 text-text-muted transition hover:bg-surface-2 hover:text-text"
+            >
+              {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
           </div>
-        </button>
+        </div>
 
         {expanded && (
           <div className="border-t border-border px-4 pb-3 pt-2">
@@ -281,6 +313,7 @@ export function DeudasPage() {
                   clienteId={c.cliente_id}
                   nombre={c.cliente_nombre}
                   apellido={c.cliente_apellido}
+                  telefono={c.cliente_telefono}
                   cantidadDeudas={Number(c.cantidad_deudas)}
                   totalDeuda={Number(c.total_deuda)}
                   canWrite={canWrite}

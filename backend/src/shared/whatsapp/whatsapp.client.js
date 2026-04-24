@@ -178,7 +178,7 @@ async function inicializar() {
 
   client.initialize().catch((error) => {
     lastError = error.message;
-    logger.error({ error, browserPath }, "Error al inicializar WhatsApp");
+    logger.error({ error: error.message, stack: error.stack, browserPath }, "Error al inicializar WhatsApp");
     resetRuntimeState("error");
     scheduleReconnect("initialize_error");
   });

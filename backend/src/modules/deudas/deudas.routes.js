@@ -8,6 +8,11 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get("/resumen-clientes", requirePermiso("clientes", "r"), DeudasController.resumenPorCliente);
+router.post(
+  "/clientes/:clienteId/recordatorio-whatsapp",
+  requirePermiso("clientes", "w"),
+  DeudasController.enviarRecordatorioCliente
+);
 router.get("/",                 requirePermiso("clientes", "r"), DeudasController.listar);
 router.post("/",                requirePermiso("clientes", "w"), DeudasController.crear);
 router.get("/:id",              requirePermiso("clientes", "r"), DeudasController.obtener);

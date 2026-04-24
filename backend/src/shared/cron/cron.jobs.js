@@ -21,10 +21,15 @@ function iniciarCrons() {
       }
 
       const config = await getConfig([
+        "recordatorio_deuda_auto",
         "recordatorio_deuda_dias",
         "recordatorio_deuda_monto_min",
         "taller_nombre",
       ]);
+
+      if (config.recordatorio_deuda_auto !== "1") {
+        return;
+      }
 
       const diasIntervalo = Number(config.recordatorio_deuda_dias) || 7;
       const montoMinimo = Number(config.recordatorio_deuda_monto_min) || 1;

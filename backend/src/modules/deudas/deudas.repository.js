@@ -140,6 +140,23 @@ const DeudasRepository = {
 
     return { clientes: rows, total_general: totalGeneral };
   },
+
+  async getSaldoPendienteCliente(clienteId) {
+    const resumen = await db("deudas")
+      .where("activo", 1)
+      .where("cliente_id", clienteId)
+      .whereIn("estado", ["pendiente", "parcial"])
+      .select(
+        db.raw("COUNT(id) as cantidad_deudas"),
+        db.raw("COALESCE(SUM(monto_original - monto_pagado), 0) as total_deuda")
+      )
+      .first();
+
+    return {
+      cantidad_deudas: Number(resumen?.cantidad_deudas) || 0,
+      total_deuda: Number(resumen?.total_deuda) || 0,
+    };
+  },
 };
 
 module.exports = DeudasRepository;

@@ -68,4 +68,9 @@ export const deudasApi = {
 
   eliminar: (id: number) =>
     api.delete<{ ok: boolean }>(`/deudas/${id}`),
+
+  enviarRecordatorio: (clienteId: number) =>
+    api.post<{ ok: boolean; data: { cliente_id: number; telefono: string; total_deuda: number } }>(
+      `/deudas/clientes/${clienteId}/recordatorio-whatsapp`
+    ),
 };

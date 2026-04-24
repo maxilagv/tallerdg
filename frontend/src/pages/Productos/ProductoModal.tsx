@@ -65,49 +65,71 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
     reset,
     setValue,
     setFocus,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
   const codigoFieldRef = useRef<HTMLInputElement | null>(null);
+  const formResetKeyRef = useRef<string | null>(null);
   const codigoRegister = register("codigo");
   const nombreRegister = register("nombre");
 
-  useEffect(() => {
-    const producto = detalleQuery.data?.data.data || editing;
+  const resetWithProducto = (producto: Producto) => {
+    reset({
+      categoria_id: String(producto.categoria_id),
+      proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : "",
+      nombre: producto.nombre,
+      codigo: producto.codigo || "",
+      marca: producto.marca || "",
+      descripcion: producto.descripcion || "",
+      precio_costo: String(producto.precio_costo ?? 0),
+      precio_venta: String(producto.precio_venta ?? 0),
+      stock_actual: String(producto.stock_actual ?? 0),
+      stock_minimo: String(producto.stock_minimo ?? 0),
+      unidad: producto.unidad || "unidad",
+    });
+  };
 
-    if (producto) {
-      reset({
-        categoria_id: String(producto.categoria_id),
-        proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : "",
-        nombre: producto.nombre,
-        codigo: producto.codigo || "",
-        marca: producto.marca || "",
-        descripcion: producto.descripcion || "",
-        precio_costo: String(producto.precio_costo ?? 0),
-        precio_venta: String(producto.precio_venta ?? 0),
-        stock_actual: String(producto.stock_actual ?? 0),
-        stock_minimo: String(producto.stock_minimo ?? 0),
-        unidad: producto.unidad || "unidad",
-      });
+  useEffect(() => {
+    if (!open) {
+      formResetKeyRef.current = null;
       return;
     }
 
-    reset({
-      categoria_id: "",
-      proveedor_id: "",
-      nombre: "",
-      codigo: "",
-      marca: "",
-      descripcion: "",
-      precio_costo: "0",
-      precio_venta: "0",
-      stock_actual: "0",
-      stock_minimo: "0",
-      unidad: "unidad",
-    });
-  }, [editing, reset, open, detalleQuery.data]);
+    const resetKey = editing ? `edit-${editing.id}` : "new";
+    const detalle = detalleQuery.data?.data.data;
+
+    if (editing) {
+      if (formResetKeyRef.current !== resetKey) {
+        resetWithProducto(detalle || editing);
+        formResetKeyRef.current = resetKey;
+        return;
+      }
+
+      if (detalle && !isDirty) {
+        resetWithProducto(detalle);
+      }
+      return;
+    }
+
+    if (formResetKeyRef.current !== resetKey) {
+      reset({
+        categoria_id: "",
+        proveedor_id: "",
+        nombre: "",
+        codigo: "",
+        marca: "",
+        descripcion: "",
+        precio_costo: "0",
+        precio_venta: "0",
+        stock_actual: "0",
+        stock_minimo: "0",
+        unidad: "unidad",
+      });
+      formResetKeyRef.current = resetKey;
+    }
+  }, [editing, reset, open, detalleQuery.data, isDirty]);
 
   // Auto-focus the barcode field on open (new product) so the scanner lands on it.
   useEffect(() => {

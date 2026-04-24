@@ -30,8 +30,17 @@ const DeudasController = {
 
   async crear(req, res, next) {
     try {
-      const data = await DeudasService.crear(req.body, req.empleado?.id);
+      const data = await DeudasService.crear(req.body, req.user?.id);
       res.status(201).json({ ok: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async enviarRecordatorioCliente(req, res, next) {
+    try {
+      const data = await DeudasService.enviarRecordatorioCliente(req.params.clienteId);
+      res.json({ ok: true, data });
     } catch (err) {
       next(err);
     }

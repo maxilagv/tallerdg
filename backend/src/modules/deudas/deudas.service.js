@@ -1,8 +1,10 @@
 const { z } = require("zod");
 const AppError = require("../../shared/errors/AppError");
+const db = require("../../shared/db/knex");
 const ClientesRepository = require("../clientes/clientes.repository");
 const DeudasRepository = require("./deudas.repository");
 const PagosRepository = require("../pagos/pagos.repository");
+const WhatsAppService = require("../whatsapp/whatsapp.service");
 const {
   listDeudasSchema,
   createDeudaSchema,
@@ -165,6 +167,41 @@ const DeudasService = {
     const totalGeneral = mergedClientes.reduce((acc, c) => acc + c.total_deuda, 0);
 
     return { clientes: mergedClientes, total_general: totalGeneral };
+  },
+
+  async enviarRecordatorioCliente(clienteId) {
+    const id = parseId(clienteId);
+    const cliente = await ClientesRepository.findById(id);
+    if (!cliente) throw new AppError("El cliente no existe.", 404, "NOT_FOUND");
+    if (!cliente.telefono) {
+      throw new AppError("El cliente no tiene telefono cargado.", 400, "CLIENTE_SIN_TELEFONO");
+    }
+
+    const [deudaManual, deudaOrdenes, configRows] = await Promise.all([
+      DeudasRepository.getSaldoPendienteCliente(id),
+      PagosRepository.getDeudaCliente(id),
+      db("configuracion").whereIn("clave", ["taller_nombre"]),
+    ]);
+
+    const config = Object.fromEntries(configRows.map((row) => [row.clave, row.valor]));
+    const totalDeuda = Number(deudaManual.total_deuda) + Number(deudaOrdenes.total_deuda);
+
+    if (totalDeuda <= 0) {
+      throw new AppError("El cliente no tiene deuda pendiente.", 400, "SIN_DEUDA_PENDIENTE");
+    }
+
+    await WhatsAppService.enviarConLog(cliente.telefono, "recordatorio_deuda", {
+      nombre: cliente.nombre,
+      monto: `$${totalDeuda.toLocaleString("es-AR")}`,
+      taller: config.taller_nombre || "el taller",
+    }, { throwOnError: true });
+
+    return {
+      cliente_id: id,
+      telefono: cliente.telefono,
+      total_deuda: totalDeuda,
+      cantidad_deudas: deudaManual.cantidad_deudas + deudaOrdenes.ordenes.length,
+    };
   },
 };
 

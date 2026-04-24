@@ -39,7 +39,7 @@ const ProveedoresController = {
     const data = await ProveedoresService.activarCuentaCorriente(
       req.params.id,
       req.body,
-      req.empleado.id
+      req.user?.id
     );
     return res.json({ ok: true, data });
   },
@@ -48,7 +48,7 @@ const ProveedoresController = {
     const data = await ProveedoresService.registrarPago(
       req.params.id,
       req.body,
-      req.empleado.id
+      req.user?.id
     );
     return res.json({ ok: true, data });
   },

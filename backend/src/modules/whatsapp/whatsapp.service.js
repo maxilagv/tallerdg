@@ -63,7 +63,7 @@ const WhatsAppService = {
     return whatsappClient.getEstado();
   },
 
-  async enviarConLog(telefono, tipo, variables) {
+  async enviarConLog(telefono, tipo, variables, options = {}) {
     const config = await getConfig(["wsp_activo"]);
 
     if (config.wsp_activo === "0") {
@@ -95,6 +95,14 @@ const WhatsAppService = {
       });
 
       logger.warn({ tipo, destinatario: telefono, error: error.message }, "WhatsApp falló");
+
+      if (options.throwOnError) {
+        throw new AppError(
+          "No se pudo enviar el WhatsApp. Revisa que la sesion este conectada.",
+          503,
+          "WHATSAPP_SEND_FAILED"
+        );
+      }
     }
 
     return { ok: true };
