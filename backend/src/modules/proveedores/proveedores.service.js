@@ -21,6 +21,16 @@ function parseId(value) {
   return parsed.data;
 }
 
+function normalizarFechaMovimiento(fecha) {
+  if (!fecha) return null;
+  const normalized = String(fecha).slice(0, 10);
+  const parsed = new Date(`${normalized}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError("La fecha del movimiento es invalida.", 400, "VALIDATION_ERROR");
+  }
+  return `${normalized} 12:00:00`;
+}
+
 const ProveedoresService = {
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -173,6 +183,7 @@ const ProveedoresService = {
         descripcion: parsed.data.descripcion,
         compra_id: null,
         empleado_id: empleadoId,
+        created_at: normalizarFechaMovimiento(parsed.data.fecha),
       });
 
       // Reducimos la deuda

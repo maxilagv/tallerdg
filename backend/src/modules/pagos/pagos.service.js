@@ -27,6 +27,16 @@ function normalizarImporte(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function normalizarFechaMovimiento(fecha) {
+  if (!fecha) return null;
+  const normalized = String(fecha).slice(0, 10);
+  const parsed = new Date(`${normalized}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError("La fecha del movimiento es invalida.", 400, "VALIDATION_ERROR");
+  }
+  return `${normalized} 12:00:00`;
+}
+
 function resolverEstadoPago(total, totalPagado) {
   if (normalizarImporte(total) <= 0) {
     return "pagado";
@@ -165,6 +175,7 @@ const PagosService = {
           orden_id: parsed.data.orden_id,
           monto: normalizarImporte(parsed.data.monto),
           metodo: parsed.data.metodo,
+          created_at: normalizarFechaMovimiento(parsed.data.fecha) || trx.fn.now(),
           referencia: parsed.data.referencia || null,
           notas: parsed.data.notas || null,
           empleado_id: usuarioId,

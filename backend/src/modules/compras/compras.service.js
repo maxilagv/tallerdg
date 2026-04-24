@@ -31,13 +31,24 @@ const ComprasService = {
       throw new AppError(parsed.error.issues[0]?.message || "Datos inválidos.", 400, "VALIDATION_ERROR");
     }
 
-    const { items, proveedor_id, fecha, notas } = parsed.data;
+    const {
+      items,
+      proveedor_id,
+      origen_tipo = proveedor_id ? "proveedor" : "directa",
+      origen_nombre,
+      actualiza_stock = true,
+      fecha,
+      notas,
+    } = parsed.data;
 
     // Calcular total de la compra
     const total = items.reduce((sum, item) => sum + item.cantidad * item.precio_unitario, 0);
 
     const compraData = {
-      proveedor_id: proveedor_id || null,
+      proveedor_id: origen_tipo === "proveedor" ? proveedor_id || null : null,
+      origen_tipo,
+      origen_nombre: origen_tipo === "casa_repuestos" ? origen_nombre || null : null,
+      actualiza_stock,
       fecha,
       total,
       notas: notas || null,

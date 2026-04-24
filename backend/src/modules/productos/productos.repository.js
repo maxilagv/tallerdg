@@ -38,6 +38,7 @@ const ProductosRepository = {
           "p.nombre",
           "p.codigo",
           "p.marca",
+          "p.descripcion",
           "p.precio_costo",
           "p.precio_venta",
           "p.stock_actual",

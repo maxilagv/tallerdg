@@ -12,6 +12,7 @@ const createOrdenSchema = z.object({
   cliente_id: z.coerce.number().int().positive("El cliente es obligatorio"),
   vehiculo_id: z.coerce.number().int().positive("El vehiculo es obligatorio"),
   empleado_id: z.coerce.number().int().positive().nullable().optional(),
+  fecha_ingreso: z.string().trim().min(1).optional(),
   km_entrada: z.coerce.number().int().min(0).default(0),
   notas_cliente: z.string().trim().nullable().optional(),
   adelanto: z.coerce.number().min(0).default(0).optional(),
@@ -77,6 +78,28 @@ const notasOrdenSchema = z
     }
   );
 
+const updateOrdenSchema = z
+  .object({
+    cliente_id: z.coerce.number().int().positive().optional(),
+    vehiculo_id: z.coerce.number().int().positive().optional(),
+    fecha_ingreso: z.string().trim().min(1).optional(),
+    notas_cliente: z.string().trim().nullable().optional(),
+    notas_mecanico: z.string().trim().nullable().optional(),
+    km_entrada: z.coerce.number().int().min(0).optional(),
+  })
+  .refine(
+    (data) =>
+      data.cliente_id !== undefined ||
+      data.vehiculo_id !== undefined ||
+      data.fecha_ingreso !== undefined ||
+      data.notas_cliente !== undefined ||
+      data.notas_mecanico !== undefined ||
+      data.km_entrada !== undefined,
+    {
+      message: "Debes enviar al menos un campo para actualizar.",
+    }
+  );
+
 const descuentoOrdenSchema = z.object({
   descuento: z.coerce.number().min(0, "El descuento no puede ser negativo"),
 });
@@ -133,4 +156,5 @@ module.exports = {
   notasOrdenSchema,
   descuentoOrdenSchema,
   recordatorioServiceSchema,
+  updateOrdenSchema,
 };

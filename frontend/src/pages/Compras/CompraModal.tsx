@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Minus, Plus, Search, Trash2 } from "lucide-react";
+import { Minus, PackagePlus, Plus, Search, Trash2 } from "lucide-react";
 import { comprasApi, type CreateCompraPayload } from "../../features/compras/api";
 import { productosApi } from "../../features/productos/api";
 import { proveedoresApi } from "../../features/proveedores/api";
@@ -13,10 +13,11 @@ import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { formatMoney } from "../../shared/utils/format";
 
 interface ItemLocal {
-  producto_id: number;
+  producto_id?: number | null;
   producto_nombre: string;
   codigo?: string | null;
   unidad: string;
+  descripcion?: string | null;
   cantidad: number;
   precio_unitario: number;
 }
@@ -30,7 +31,10 @@ interface Props {
 export function CompraModal({ open, onClose, onSuccess }: Props) {
   const { add } = useToast();
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [origenTipo, setOrigenTipo] = useState<"directa" | "proveedor" | "casa_repuestos">("directa");
   const [proveedorId, setProveedorId] = useState("");
+  const [origenNombre, setOrigenNombre] = useState("");
+  const [actualizaStock, setActualizaStock] = useState(true);
   const [notas, setNotas] = useState("");
   const [searchProducto, setSearchProducto] = useState("");
   const [items, setItems] = useState<ItemLocal[]>([]);
@@ -71,27 +75,74 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
     setSearchProducto("");
   };
 
-  const quitarItem = (productoId: number) =>
-    setItems((prev) => prev.filter((i) => i.producto_id !== productoId));
+  const agregarItemLibre = () => {
+    const descripcion = searchProducto.trim();
+    if (!descripcion) return;
 
-  const updateCantidad = (productoId: number, cantidad: number) => {
-    if (cantidad <= 0) return quitarItem(productoId);
-    setItems((prev) => prev.map((i) => i.producto_id === productoId ? { ...i, cantidad } : i));
+    setItems((prev) => [
+      ...prev,
+      {
+        producto_id: null,
+        producto_nombre: descripcion,
+        descripcion,
+        unidad: "unidad",
+        cantidad: 1,
+        precio_unitario: 0,
+      },
+    ]);
+    setSearchProducto("");
   };
 
-  const updatePrecio = (productoId: number, precio: number) =>
-    setItems((prev) => prev.map((i) => i.producto_id === productoId ? { ...i, precio_unitario: precio } : i));
+  const quitarItem = (index: number) =>
+    setItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+
+  const updateCantidad = (index: number, cantidad: number) => {
+    if (cantidad <= 0) return quitarItem(index);
+    setItems((prev) => prev.map((i, itemIndex) => itemIndex === index ? { ...i, cantidad } : i));
+  };
+
+  const updatePrecio = (index: number, precio: number) =>
+    setItems((prev) => prev.map((i, itemIndex) => itemIndex === index ? { ...i, precio_unitario: precio } : i));
+
+  const updateDescripcion = (index: number, descripcion: string) =>
+    setItems((prev) =>
+      prev.map((i, itemIndex) =>
+        itemIndex === index
+          ? {
+              ...i,
+              descripcion,
+              producto_nombre: i.producto_id ? i.producto_nombre : descripcion,
+            }
+          : i
+      )
+    );
 
   const total = items.reduce((sum, i) => sum + i.cantidad * i.precio_unitario, 0);
+  const itemsValidos = items.every((item) => item.producto_id || item.descripcion?.trim());
+  const origenValido =
+    origenTipo === "proveedor"
+      ? Boolean(proveedorId)
+      : origenTipo === "casa_repuestos"
+        ? Boolean(origenNombre.trim())
+        : true;
+  const puedeGuardar =
+    items.length > 0 &&
+    itemsValidos &&
+    origenValido &&
+    (!actualizaStock || items.every((item) => item.producto_id));
 
   const mutation = useMutation({
     mutationFn: () => {
       const payload: CreateCompraPayload = {
-        proveedor_id: proveedorId ? Number(proveedorId) : null,
+        proveedor_id: origenTipo === "proveedor" && proveedorId ? Number(proveedorId) : null,
+        origen_tipo: origenTipo,
+        origen_nombre: origenTipo === "casa_repuestos" ? origenNombre.trim() || null : null,
+        actualiza_stock: actualizaStock,
         fecha,
         notas: notas || null,
         items: items.map((i) => ({
-          producto_id:     i.producto_id,
+          producto_id:     i.producto_id || null,
+          descripcion:     i.descripcion || i.producto_nombre || null,
           cantidad:        i.cantidad,
           precio_unitario: i.precio_unitario,
         })),
@@ -99,7 +150,7 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
       return comprasApi.crear(payload);
     },
     onSuccess: () => {
-      add("Compra registrada. El stock fue actualizado automáticamente.");
+      add(actualizaStock ? "Compra registrada. El stock fue actualizado." : "Compra registrada sin modificar stock.");
       resetForm();
       onSuccess();
       onClose();
@@ -109,7 +160,10 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
 
   const resetForm = () => {
     setFecha(new Date().toISOString().slice(0, 10));
+    setOrigenTipo("directa");
     setProveedorId("");
+    setOrigenNombre("");
+    setActualizaStock(true);
     setNotas("");
     setSearchProducto("");
     setItems([]);
@@ -123,16 +177,20 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
         {/* Datos generales */}
         <div className="grid gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-muted">Proveedor</label>
+            <label className="text-sm font-medium text-text-muted">Tipo de compra</label>
             <select
-              value={proveedorId}
-              onChange={(e) => setProveedorId(e.target.value)}
+              value={origenTipo}
+              onChange={(e) => {
+                const next = e.target.value as typeof origenTipo;
+                setOrigenTipo(next);
+                if (next !== "proveedor") setProveedorId("");
+                if (next !== "casa_repuestos") setOrigenNombre("");
+              }}
               className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
             >
-              <option value="">Sin proveedor (compra directa)</option>
-              {proveedores.map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
+              <option value="directa">Compra directa / libre</option>
+              <option value="proveedor">Proveedor registrado</option>
+              <option value="casa_repuestos">Casa de repuestos</option>
             </select>
           </div>
           <Input
@@ -142,6 +200,46 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
             onChange={(e) => setFecha(e.target.value)}
           />
         </div>
+
+        {origenTipo === "proveedor" ? (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-muted">Proveedor</label>
+            <select
+              value={proveedorId}
+              onChange={(e) => setProveedorId(e.target.value)}
+              className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+            >
+              <option value="">Seleccionar proveedor</option>
+              {proveedores.map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+
+        {origenTipo === "casa_repuestos" ? (
+          <Input
+            label="Nombre de la casa de repuestos"
+            value={origenNombre}
+            onChange={(e) => setOrigenNombre(e.target.value)}
+            placeholder="Ej: Repuestos Centro"
+          />
+        ) : null}
+
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm">
+          <input
+            type="checkbox"
+            checked={actualizaStock}
+            onChange={(e) => setActualizaStock(e.target.checked)}
+            className="mt-1 h-4 w-4 accent-primary"
+          />
+          <span>
+            <span className="block font-medium text-text">Sumar esta compra al stock</span>
+            <span className="text-text-muted">
+              Desactivalo para registrar compras libres, presupuestos o repuestos que no queres cargar al inventario.
+            </span>
+          </span>
+        </label>
 
         {/* Buscador de productos */}
         <div>
@@ -153,7 +251,7 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
             <input
               value={searchProducto}
               onChange={(e) => setSearchProducto(e.target.value)}
-              placeholder="Buscar producto por nombre o código..."
+              placeholder={actualizaStock ? "Buscar producto por nombre o codigo..." : "Buscar producto o escribir descripcion libre..."}
               className="w-full rounded-xl border border-border bg-surface-3 px-10 py-2.5 text-sm text-text outline-none transition focus:border-primary"
             />
           </div>
@@ -180,8 +278,23 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
           )}
 
           {searchProducto && !productosQuery.isLoading && productosResultado.length === 0 && (
-            <p className="mt-2 text-xs text-text-muted">No se encontraron productos con ese criterio.</p>
+            <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2">
+              <p className="text-xs text-text-muted">No se encontraron productos con ese criterio.</p>
+              {!actualizaStock ? (
+                <Button size="sm" variant="secondary" onClick={agregarItemLibre}>
+                  <PackagePlus size={14} /> Agregar libre
+                </Button>
+              ) : null}
+            </div>
           )}
+
+          {searchProducto && !actualizaStock && productosResultado.length > 0 ? (
+            <div className="mt-2 flex justify-end">
+              <Button size="sm" variant="secondary" onClick={agregarItemLibre}>
+                <PackagePlus size={14} /> Agregar item libre
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         {/* Lista de items agregados */}
@@ -193,13 +306,21 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
               <span className="text-right">Precio costo</span>
               <span />
             </div>
-            {items.map((item) => (
+            {items.map((item, index) => (
               <div
-                key={item.producto_id}
+                key={`${item.producto_id || "libre"}-${index}`}
                 className="grid grid-cols-[1fr_100px_120px_32px] items-center gap-2 border-b border-border/40 px-3 py-2.5 last:border-0"
               >
                 <div>
-                  <p className="text-sm font-medium text-text">{item.producto_nombre}</p>
+                  {item.producto_id ? (
+                    <p className="text-sm font-medium text-text">{item.producto_nombre}</p>
+                  ) : (
+                    <input
+                      value={item.descripcion || ""}
+                      onChange={(e) => updateDescripcion(index, e.target.value)}
+                      className="w-full rounded-lg border border-border bg-surface-3 px-2 py-1 text-sm font-medium text-text outline-none focus:border-primary"
+                    />
+                  )}
                   <p className="text-xs text-text-muted">
                     Subtotal: {formatMoney(item.cantidad * item.precio_unitario)}
                   </p>
@@ -207,7 +328,7 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
                 <div className="flex items-center justify-center gap-1">
                   <button
                     type="button"
-                    onClick={() => updateCantidad(item.producto_id, item.cantidad - 1)}
+                    onClick={() => updateCantidad(index, item.cantidad - 1)}
                     className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-3 text-text-muted hover:text-text transition"
                   >
                     <Minus size={12} />
@@ -215,7 +336,7 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
                   <span className="w-8 text-center text-sm font-medium">{item.cantidad}</span>
                   <button
                     type="button"
-                    onClick={() => updateCantidad(item.producto_id, item.cantidad + 1)}
+                    onClick={() => updateCantidad(index, item.cantidad + 1)}
                     className="flex h-6 w-6 items-center justify-center rounded-lg bg-surface-3 text-text-muted hover:text-text transition"
                   >
                     <Plus size={12} />
@@ -226,12 +347,12 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
                   min="0"
                   step="0.01"
                   value={item.precio_unitario}
-                  onChange={(e) => updatePrecio(item.producto_id, Number(e.target.value))}
+                  onChange={(e) => updatePrecio(index, Number(e.target.value))}
                   className="rounded-lg border border-border bg-surface-3 px-2 py-1 text-right text-sm text-text outline-none focus:border-primary w-full"
                 />
                 <button
                   type="button"
-                  onClick={() => quitarItem(item.producto_id)}
+                  onClick={() => quitarItem(index)}
                   className="flex h-6 w-6 items-center justify-center text-text-muted hover:text-red-300 transition"
                 >
                   <Trash2 size={14} />
@@ -251,7 +372,9 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
 
         {items.length === 0 && (
           <div className="rounded-xl border border-dashed border-border bg-surface-2 py-8 text-center text-sm text-text-muted">
-            Buscá y agregá los productos que compraste para actualizar el stock automáticamente.
+            {actualizaStock
+              ? "Busca y agrega productos para sumar stock."
+              : "Busca productos o agrega items libres para dejar registrada la compra."}
           </div>
         )}
 
@@ -271,9 +394,9 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
           <Button
             onClick={() => mutation.mutate()}
             loading={mutation.isPending}
-            disabled={items.length === 0}
+            disabled={!puedeGuardar}
           >
-            Registrar compra y actualizar stock
+            {actualizaStock ? "Registrar compra y actualizar stock" : "Registrar compra"}
           </Button>
         </div>
       </div>

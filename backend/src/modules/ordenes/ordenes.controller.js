@@ -22,6 +22,11 @@ const OrdenesController = {
     return res.status(201).json({ ok: true, data });
   },
 
+  async actualizar(req, res) {
+    const data = await OrdenesService.actualizar(req.params.id, req.body);
+    return res.json({ ok: true, data });
+  },
+
   async agregarServicio(req, res) {
     const { orden, servicio_creado } = await OrdenesService.agregarServicio(req.params.id, req.body);
     return res.json({ ok: true, data: orden, servicio_creado });
@@ -70,6 +75,11 @@ const OrdenesController = {
   async eliminarRecordatorioService(req, res) {
     const data = await OrdenesService.eliminarRecordatorioService(req.params.id);
     return res.json({ ok: true, data });
+  },
+
+  async eliminar(req, res) {
+    await OrdenesService.eliminarCancelada(req.params.id, req.user?.id);
+    return res.json({ ok: true, message: "Orden eliminada correctamente." });
   },
 
   async descargarRemito(req, res) {

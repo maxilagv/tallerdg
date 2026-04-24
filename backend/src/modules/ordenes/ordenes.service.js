@@ -19,6 +19,7 @@ const {
   notasOrdenSchema,
   descuentoOrdenSchema,
   recordatorioServiceSchema,
+  updateOrdenSchema,
 } = require("./ordenes.validation");
 
 const idSchema = z.coerce.number().int().positive();
@@ -50,6 +51,16 @@ function normalizarServicioRecordatorio(value) {
 
 function formatISODate(value) {
   return new Date(value).toISOString().slice(0, 10);
+}
+
+function normalizarFechaMovimiento(fecha) {
+  if (!fecha) return null;
+  const normalized = String(fecha).slice(0, 10);
+  const parsed = new Date(`${normalized}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError("La fecha es invalida.", 400, "VALIDATION_ERROR");
+  }
+  return `${normalized} 12:00:00`;
 }
 
 function addDays(baseDate, days) {
@@ -173,6 +184,7 @@ const OrdenesService = {
         notas_cliente: parsed.data.notas_cliente || null,
         adelanto,
         adelanto_metodo: adelantoMetodo,
+        ...(parsed.data.fecha_ingreso && { created_at: normalizarFechaMovimiento(parsed.data.fecha_ingreso) }),
       });
 
       const numero = await generarNumeroOrden(createdId, trx);
@@ -190,7 +202,7 @@ const OrdenesService = {
           metodo: adelantoMetodo,
           notas: "Adelanto al ingreso del vehículo",
           empleado_id: parsed.data.empleado_id || usuarioId,
-          created_at: trx.fn.now(),
+          created_at: normalizarFechaMovimiento(parsed.data.fecha_ingreso) || trx.fn.now(),
         });
 
         await trx("ordenes").where({ id: createdId }).update({
@@ -200,6 +212,53 @@ const OrdenesService = {
       }
 
       ordenId = createdId;
+    });
+
+    return this.obtener(ordenId);
+  },
+
+  async actualizar(id, data) {
+    const ordenId = parseId(id);
+    const parsed = updateOrdenSchema.safeParse(data);
+
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0]?.message || "Datos invalidos.", 400, "VALIDATION_ERROR");
+    }
+
+    await db.transaction(async (trx) => {
+      const orden = await ensureOrdenEditable(ordenId, trx);
+      const clienteId = parsed.data.cliente_id ?? orden.cliente_id;
+      const vehiculoId = parsed.data.vehiculo_id ?? orden.vehiculo_id;
+
+      if (parsed.data.cliente_id) {
+        const cliente = await ClientesRepository.findById(parsed.data.cliente_id);
+        if (!cliente) {
+          throw new AppError("El cliente no existe.", 404, "NOT_FOUND");
+        }
+      }
+
+      if (parsed.data.vehiculo_id || parsed.data.cliente_id) {
+        const vehiculo = await VehiculosRepository.findById(vehiculoId);
+        if (!vehiculo) {
+          throw new AppError("El vehiculo no existe.", 404, "NOT_FOUND");
+        }
+
+        if (vehiculo.cliente_id !== clienteId) {
+          throw new AppError("El vehiculo no pertenece al cliente seleccionado.", 400, "VEHICULO_MISMATCH");
+        }
+      }
+
+      await trx("ordenes").where({ id: ordenId }).update({
+        ...(parsed.data.cliente_id !== undefined && { cliente_id: parsed.data.cliente_id }),
+        ...(parsed.data.vehiculo_id !== undefined && { vehiculo_id: parsed.data.vehiculo_id }),
+        ...(parsed.data.km_entrada !== undefined && { km_entrada: parsed.data.km_entrada }),
+        ...(parsed.data.notas_cliente !== undefined && { notas_cliente: parsed.data.notas_cliente || null }),
+        ...(parsed.data.notas_mecanico !== undefined && { notas_mecanico: parsed.data.notas_mecanico || null }),
+        ...(parsed.data.fecha_ingreso !== undefined && {
+          created_at: normalizarFechaMovimiento(parsed.data.fecha_ingreso),
+        }),
+        updated_at: trx.fn.now(),
+      });
     });
 
     return this.obtener(ordenId);
@@ -693,6 +752,70 @@ const OrdenesService = {
     });
 
     return this.obtener(ordenId);
+  },
+
+  async eliminarCancelada(id, usuarioId) {
+    const ordenId = parseId(id);
+
+    await db.transaction(async (trx) => {
+      const orden = await trx("ordenes").where({ id: ordenId }).forUpdate().first();
+
+      if (!orden) {
+        throw new AppError("Trabajo no encontrado.", 404, "NOT_FOUND");
+      }
+
+      if (orden.estado !== "cancelada") {
+        throw new AppError("Solo se pueden eliminar ordenes canceladas.", 400, "ORDEN_NOT_CANCELLED");
+      }
+
+      const [{ total: pagosRegistrados }] = await trx("pagos")
+        .where({ orden_id: ordenId })
+        .count("id as total");
+
+      if (Number(pagosRegistrados) > 0) {
+        throw new AppError(
+          "No se puede eliminar una orden cancelada con cobros registrados. Anula o revisa esos movimientos primero.",
+          409,
+          "ORDEN_HAS_PAYMENTS"
+        );
+      }
+
+      const productos = await trx("orden_productos").where({ orden_id: ordenId });
+
+      for (const item of productos) {
+        const producto = await trx("productos").where({ id: item.producto_id }).forUpdate().first();
+        if (!producto) {
+          continue;
+        }
+
+        const stockAnterior = Number(producto.stock_actual);
+        const cantidad = Number(item.cantidad);
+        const stockNuevo = stockAnterior + cantidad;
+
+        await trx("productos").where({ id: producto.id }).update({
+          stock_actual: stockNuevo,
+          updated_at: trx.fn.now(),
+        });
+
+        await trx("movimientos_stock").insert({
+          producto_id: producto.id,
+          tipo: "entrada",
+          cantidad,
+          stock_anterior: stockAnterior,
+          stock_nuevo: stockNuevo,
+          referencia_tipo: "orden_eliminada",
+          referencia_id: ordenId,
+          empleado_id: usuarioId || null,
+          notas: "Reposicion por eliminacion de orden cancelada",
+        });
+      }
+
+      await trx("ordenes_recordatorios_service").where({ orden_id: ordenId }).del();
+      await trx("remitos").where({ orden_id: ordenId }).del();
+      await trx("orden_productos").where({ orden_id: ordenId }).del();
+      await trx("orden_servicios").where({ orden_id: ordenId }).del();
+      await trx("ordenes").where({ id: ordenId }).del();
+    });
   },
 };
 

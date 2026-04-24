@@ -39,7 +39,7 @@ export function ComprasPage() {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-stock-bajo"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stock-bajo"] });
-      add("Compra eliminada. El stock fue restaurado.");
+      add("Compra eliminada.");
     },
     onError: (error) => add(getErrorMessage(error), "error"),
   });
@@ -51,7 +51,9 @@ export function ComprasPage() {
   const handleEliminar = async (c: Compra) => {
     const ok = await confirm({
       title: "¿Eliminar esta compra?",
-      description: "El stock de los productos incluidos será restaurado automáticamente.",
+      description: c.actualiza_stock
+        ? "El stock de los productos incluidos sera restaurado automaticamente."
+        : "Se eliminara el registro de compra sin tocar stock.",
       confirmLabel: "Sí, eliminar",
       variant: "warning",
     });
@@ -65,9 +67,9 @@ export function ComprasPage() {
     <div className="space-y-5">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-text">Compras a proveedores</h1>
+          <h1 className="text-2xl font-bold text-text">Compras</h1>
           <p className="mt-1 text-sm text-text-muted">
-            Registrá las compras de productos. El stock se actualiza automáticamente.
+            Registra compras de proveedor, casas de repuestos o compras libres con stock opcional.
           </p>
         </div>
         <Button onClick={() => setModalOpen(true)}>
@@ -92,7 +94,7 @@ export function ComprasPage() {
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">
                     <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">Proveedor</th>
+                    <th className="px-4 py-3">Origen</th>
                     <th className="px-4 py-3">Total</th>
                     <th className="px-4 py-3">Notas</th>
                     <th className="px-4 py-3 text-right">Acciones</th>
@@ -108,7 +110,14 @@ export function ComprasPage() {
                       >
                         <td className="px-4 py-3 text-text-muted">{formatDate(c.fecha)}</td>
                         <td className="px-4 py-3 font-medium text-text">
-                          {c.proveedor_nombre || <span className="text-text-muted text-xs">Sin proveedor</span>}
+                          {c.proveedor_nombre ||
+                            c.origen_nombre ||
+                            <span className="text-text-muted text-xs">Compra directa</span>}
+                          {!c.actualiza_stock ? (
+                            <span className="ml-2 rounded-lg bg-surface-3 px-2 py-0.5 text-xs text-text-muted">
+                              sin stock
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-4 py-3 font-semibold text-green-300">{formatMoney(c.total)}</td>
                         <td className="px-4 py-3 text-text-muted text-xs max-w-48 truncate">
@@ -139,19 +148,19 @@ export function ComprasPage() {
                             ) : detalle?.items?.length ? (
                               <div className="space-y-1">
                                 <p className="text-xs font-semibold text-text-muted uppercase mb-2">
-                                  Productos incluidos
+                                  Items incluidos
                                 </p>
                                 {detalle.items.map((item) => (
                                   <div key={item.id} className="flex items-center justify-between text-sm">
                                     <div className="flex items-center gap-2 text-text">
                                       <Package size={13} className="text-text-muted" />
-                                      <span>{item.producto_nombre}</span>
+                                      <span>{item.producto_nombre || item.descripcion || "Item libre"}</span>
                                       {item.codigo && (
                                         <span className="text-xs text-text-muted">({item.codigo})</span>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-4 text-text-muted text-xs">
-                                      <span>{Number(item.cantidad).toLocaleString("es-AR")} {item.unidad}</span>
+                                      <span>{Number(item.cantidad).toLocaleString("es-AR")} {item.unidad || "unidad"}</span>
                                       <span>×</span>
                                       <span>{formatMoney(item.precio_unitario)}</span>
                                       <span className="font-semibold text-text">{formatMoney(item.subtotal)}</span>

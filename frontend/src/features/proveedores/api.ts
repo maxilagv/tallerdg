@@ -110,7 +110,7 @@ export const proveedoresApi = {
 
   registrarPago: (
     id: number,
-    payload: { monto: number; descripcion: string }
+    payload: { monto: number; descripcion: string; fecha?: string }
   ) =>
     api.post<{ ok: boolean; data: CuentaCorriente }>(
       `/proveedores/${id}/cuenta-corriente/pago`,

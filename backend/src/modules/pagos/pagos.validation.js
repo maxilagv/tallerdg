@@ -12,6 +12,7 @@ const createPagoSchema = z.object({
   orden_id: z.coerce.number().int().positive("La orden es obligatoria"),
   monto: z.coerce.number().gt(0, "El monto debe ser mayor a 0"),
   metodo: metodoPagoSchema,
+  fecha: z.string().trim().min(1).optional(),
   referencia: z.string().trim().max(255).nullable().optional(),
   notas: z.string().trim().nullable().optional(),
 });

@@ -16,6 +16,7 @@ export interface Pago {
   orden_numero: string;
   monto: number;
   metodo: MetodoPago;
+  fecha?: string;
   referencia?: string | null;
   notas?: string | null;
   created_at: string;
@@ -55,6 +56,7 @@ export interface CrearPagoPayload {
   orden_id: number;
   monto: number;
   metodo: MetodoPago;
+  fecha?: string;
   referencia?: string | null;
   notas?: string | null;
 }

@@ -8,8 +8,10 @@ import {
   ClipboardList,
   CreditCard,
   Download,
+  Pencil,
   Package,
   Save,
+  Trash2,
   User,
   Wrench,
   X,
@@ -39,6 +41,7 @@ import { AnularPagoModal } from "../Cobros/AnularPagoModal";
 import { RegistrarPagoModal } from "../Cobros/RegistrarPagoModal";
 import { AgregarProductoModal } from "./AgregarProductoModal";
 import { AgregarServicioModal } from "./AgregarServicioModal";
+import { EditarOrdenModal } from "./EditarOrdenModal";
 
 function formatDuracion(inicio: string, fin: string): string {
   const ms = new Date(fin).getTime() - new Date(inicio).getTime();
@@ -100,6 +103,7 @@ export function OrdenDetalle() {
   const [servicioModalOpen, setServicioModalOpen] = useState(false);
   const [productoModalOpen, setProductoModalOpen] = useState(false);
   const [registroPagoOpen, setRegistroPagoOpen] = useState(false);
+  const [editarOrdenOpen, setEditarOrdenOpen] = useState(false);
   const [pagoSeleccionado, setPagoSeleccionado] = useState<Pago | null>(null);
   const [notasCliente, setNotasCliente] = useState("");
   const [notasMecanico, setNotasMecanico] = useState("");
@@ -232,6 +236,16 @@ export function OrdenDetalle() {
     onError: (error) => add(getErrorMessage(error), "error"),
   });
 
+  const eliminarOrdenMutation = useMutation({
+    mutationFn: () => ordenesApi.eliminar(Number(id)),
+    onSuccess: async () => {
+      add("Orden cancelada eliminada.");
+      await queryClient.invalidateQueries({ queryKey: ["ordenes"] });
+      navigate("/ordenes");
+    },
+    onError: (error) => add(getErrorMessage(error), "error"),
+  });
+
   const quitarServicioMutation = useMutation({
     mutationFn: (itemId: number) => ordenesApi.quitarServicio(Number(id), itemId),
     onSuccess: async () => {
@@ -321,6 +335,12 @@ export function OrdenDetalle() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {editable && canWriteOrdenes ? (
+            <Button variant="secondary" onClick={() => setEditarOrdenOpen(true)}>
+              <Pencil size={16} /> Editar orden
+            </Button>
+          ) : null}
+
           {puedeRegistrarCobros && (orden.estado !== "cerrada" || Number(orden.saldo_pendiente) > 0) ? (
             <Button onClick={() => setRegistroPagoOpen(true)}>
               <CreditCard size={16} /> {botonCobroLabel}
@@ -345,6 +365,25 @@ export function OrdenDetalle() {
               loading={descargarRemitoMutation.isPending}
             >
               <Download size={16} /> Descargar remito
+            </Button>
+          ) : null}
+
+          {orden.estado === "cancelada" && canWriteOrdenes ? (
+            <Button
+              variant="danger"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Eliminar orden cancelada",
+                  description: "Se quitara la orden y se repondra el stock de sus productos. No se permite si tiene cobros registrados.",
+                  confirmLabel: "Eliminar",
+                  variant: "danger",
+                });
+
+                if (ok) eliminarOrdenMutation.mutate();
+              }}
+              loading={eliminarOrdenMutation.isPending}
+            >
+              <Trash2 size={16} /> Eliminar
             </Button>
           ) : null}
         </div>
@@ -894,6 +933,13 @@ export function OrdenDetalle() {
         onSuccess={invalidateAll}
       />
 
+      <EditarOrdenModal
+        open={editarOrdenOpen}
+        orden={orden}
+        onClose={() => setEditarOrdenOpen(false)}
+        onSuccess={invalidateAll}
+      />
+
       <RegistrarPagoModal
         open={registroPagoOpen}
         orden={orden}
@@ -910,7 +956,7 @@ export function OrdenDetalle() {
 
       <ConfirmModal
         {...confirmModalProps}
-        loading={quitarServicioMutation.isPending || quitarProductoMutation.isPending}
+        loading={quitarServicioMutation.isPending || quitarProductoMutation.isPending || eliminarOrdenMutation.isPending}
       />
     </div>
   );

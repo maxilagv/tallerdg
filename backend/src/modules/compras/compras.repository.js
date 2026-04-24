@@ -23,6 +23,9 @@ const ComprasRepository = {
           "c.fecha",
           "c.total",
           "c.notas",
+          "c.origen_tipo",
+          "c.origen_nombre",
+          "c.actualiza_stock",
           "c.created_at",
           "p.nombre as proveedor_nombre",
           db.raw(
@@ -45,7 +48,7 @@ const ComprasRepository = {
     if (!compra) return null;
 
     const items = await db("compra_items as ci")
-      .join("productos as pr", "ci.producto_id", "pr.id")
+      .leftJoin("productos as pr", "ci.producto_id", "pr.id")
       .where("ci.compra_id", id)
       .select("ci.*", "pr.nombre as producto_nombre", "pr.codigo", "pr.unidad");
 
@@ -60,11 +63,16 @@ const ComprasRepository = {
         const subtotal = Number(item.cantidad) * Number(item.precio_unitario);
         await trx("compra_items").insert({
           compra_id: compraId,
-          producto_id: item.producto_id,
+          producto_id: item.producto_id || null,
+          descripcion: item.descripcion || null,
           cantidad: item.cantidad,
           precio_unitario: item.precio_unitario,
           subtotal,
         });
+
+        if (!data.actualiza_stock) {
+          continue;
+        }
 
         const producto = await trx("productos")
           .where({ id: item.producto_id })
@@ -119,6 +127,10 @@ const ComprasRepository = {
       const items = await trx("compra_items").where({ compra_id: id });
 
       for (const item of items) {
+        if (!compra.actualiza_stock || !item.producto_id) {
+          continue;
+        }
+
         const producto = await trx("productos")
           .where({ id: item.producto_id })
           .first();

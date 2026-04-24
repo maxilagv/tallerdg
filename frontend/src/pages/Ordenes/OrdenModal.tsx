@@ -24,6 +24,7 @@ const METODOS_ADELANTO = [
 const schema = z.object({
   cliente_id: z.string().min(1, "Selecciona un cliente"),
   vehiculo_id: z.string().min(1, "Selecciona un vehículo"),
+  fecha_ingreso: z.string().min(1, "La fecha es obligatoria"),
   km_entrada: z.string().optional(),
   notas_cliente: z.string().optional(),
   adelanto: z.string().optional(),
@@ -84,6 +85,7 @@ export function OrdenModal({
     reset({
       cliente_id: defaultClienteId ? String(defaultClienteId) : "",
       vehiculo_id: defaultVehiculoId ? String(defaultVehiculoId) : "",
+      fecha_ingreso: new Date().toISOString().slice(0, 10),
       km_entrada: "",
       notas_cliente: "",
       adelanto: "",
@@ -99,6 +101,7 @@ export function OrdenModal({
       ordenesApi.crear({
         cliente_id: Number(values.cliente_id),
         vehiculo_id: Number(values.vehiculo_id),
+        fecha_ingreso: values.fecha_ingreso,
         km_entrada: values.km_entrada ? Number(values.km_entrada) : 0,
         notas_cliente: values.notas_cliente || null,
         adelanto: values.adelanto ? Number(values.adelanto) : 0,
@@ -195,7 +198,11 @@ export function OrdenModal({
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
+          <Input label="Fecha de ingreso" type="date" error={errors.fecha_ingreso?.message} {...register("fecha_ingreso")} />
           <Input label="Km de entrada" type="number" min="0" {...register("km_entrada")} />
+        </div>
+
+        <div>
           <div className="rounded-xl border border-border bg-surface-2 px-4 py-3 text-sm text-text-muted">
             El responsable inicial será el usuario que crea la orden.
           </div>

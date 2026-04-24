@@ -11,6 +11,7 @@ router.get("/", requirePermiso("ordenes", "r"), OrdenesController.listar);
 router.post("/", requirePermiso("ordenes", "w"), OrdenesController.crear);
 router.get("/:id", requirePermiso("ordenes", "r"), OrdenesController.obtener);
 router.get("/:id/saldo", requirePermiso("ordenes", "r"), OrdenesController.saldo);
+router.put("/:id", requirePermiso("ordenes", "w"), OrdenesController.actualizar);
 router.put("/:id/estado", requirePermiso("ordenes", "w"), OrdenesController.cambiarEstado);
 router.put("/:id/notas", requirePermiso("ordenes", "w"), OrdenesController.actualizarNotas);
 router.put("/:id/descuento", requirePermiso("ordenes", "w"), OrdenesController.aplicarDescuento);
@@ -22,5 +23,6 @@ router.post("/:id/productos", requirePermiso("ordenes", "w"), OrdenesController.
 router.post("/:id/productos/batch", requirePermiso("ordenes", "w"), OrdenesController.agregarProductosBatch);
 router.delete("/:id/productos/:itemId", requirePermiso("ordenes", "w"), OrdenesController.quitarProducto);
 router.get("/:id/remito/pdf", requirePermiso("ordenes", "r"), OrdenesController.descargarRemito);
+router.delete("/:id", requirePermiso("ordenes", "w"), OrdenesController.eliminar);
 
 module.exports = router;

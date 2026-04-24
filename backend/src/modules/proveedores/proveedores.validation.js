@@ -31,6 +31,7 @@ const activarCCSchema = z.object({
 
 const pagoProveedorSchema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a cero"),
+  fecha: z.string().trim().min(1).optional(),
   descripcion: z
     .string()
     .trim()

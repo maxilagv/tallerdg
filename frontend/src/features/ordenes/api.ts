@@ -107,6 +107,10 @@ export const ordenesApi = {
     api.get<{ ok: boolean; data: OrdenesListResponse }>("/ordenes", { params }),
   obtener: (id: number) => api.get<{ ok: boolean; data: Orden }>(`/ordenes/${id}`),
   crear: (payload: Record<string, unknown>) => api.post<{ ok: boolean; data: Orden }>("/ordenes", payload),
+  actualizar: (id: number, payload: Record<string, unknown>) =>
+    api.put<{ ok: boolean; data: Orden }>(`/ordenes/${id}`, payload),
+  eliminar: (id: number) =>
+    api.delete<{ ok: boolean; message: string }>(`/ordenes/${id}`),
   obtenerSaldo: (id: number) => api.get<{ ok: boolean; data: OrdenSaldo }>(`/ordenes/${id}/saldo`),
   actualizarNotas: (id: number, payload: Record<string, unknown>) =>
     api.put<{ ok: boolean; data: Orden }>(`/ordenes/${id}/notas`, payload),

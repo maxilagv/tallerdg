@@ -24,6 +24,7 @@ export function RegistrarPagoModal({
 }: RegistrarPagoModalProps) {
   const { add } = useToast();
   const [monto, setMonto] = useState("");
+  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [metodo, setMetodo] = useState(metodoPagoOptions[0].value);
   const [referencia, setReferencia] = useState("");
   const [notas, setNotas] = useState("");
@@ -38,6 +39,7 @@ export function RegistrarPagoModal({
     const esAdelanto = orden.estado !== "cerrada";
 
     setMonto(esAdelanto ? (saldo > 0 ? String(saldo) : "") : String(saldo));
+    setFecha(new Date().toISOString().slice(0, 10));
     setMetodo(metodoPagoOptions[0].value);
     setReferencia("");
     setNotas("");
@@ -54,6 +56,7 @@ export function RegistrarPagoModal({
         orden_id: orden.id,
         monto: Number(monto || 0),
         metodo,
+        fecha,
         referencia: referencia.trim() || null,
         notas: notas.trim() || null,
       });
@@ -115,7 +118,7 @@ export function RegistrarPagoModal({
             </div>
           ) : null}
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             <Input
               label={esAdelanto ? "Monto del adelanto" : "Monto"}
               type="number"
@@ -135,6 +138,13 @@ export function RegistrarPagoModal({
                   ? "Puedes registrar un adelanto aunque el total final de la orden todavia no este definido."
                   : `Maximo permitido: ${formatMoney(saldoPendiente)}`
               }
+            />
+
+            <Input
+              label="Fecha del movimiento"
+              type="date"
+              value={fecha}
+              onChange={(event) => setFecha(event.target.value)}
             />
 
             <div className="flex flex-col gap-1.5">

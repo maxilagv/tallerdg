@@ -16,6 +16,7 @@ import { getErrorMessage } from "../../shared/utils/errorMessage";
 
 const schema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a cero"),
+  fecha: z.string().min(1, "La fecha es obligatoria"),
   descripcion: z.string().min(1, "La descripción es obligatoria"),
 });
 
@@ -45,7 +46,7 @@ export function PagoProveedorModal({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { monto: undefined, descripcion: "" },
+    defaultValues: { monto: undefined, fecha: new Date().toISOString().slice(0, 10), descripcion: "" },
   });
 
   const mutation = useMutation({
@@ -91,6 +92,13 @@ export function PagoProveedorModal({
           placeholder="0.00"
           error={errors.monto?.message}
           {...register("monto")}
+        />
+
+        <Input
+          label="Fecha del pago *"
+          type="date"
+          error={errors.fecha?.message}
+          {...register("fecha")}
         />
 
         <div className="flex flex-col gap-1.5">

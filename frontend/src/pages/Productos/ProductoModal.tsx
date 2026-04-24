@@ -75,19 +75,21 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
   const nombreRegister = register("nombre");
 
   useEffect(() => {
-    if (editing) {
+    const producto = detalleQuery.data?.data.data || editing;
+
+    if (producto) {
       reset({
-        categoria_id: String(editing.categoria_id),
-        proveedor_id: editing.proveedor_id ? String(editing.proveedor_id) : "",
-        nombre: editing.nombre,
-        codigo: editing.codigo || "",
-        marca: editing.marca || "",
-        descripcion: editing.descripcion || "",
-        precio_costo: String(editing.precio_costo ?? 0),
-        precio_venta: String(editing.precio_venta ?? 0),
-        stock_actual: String(editing.stock_actual ?? 0),
-        stock_minimo: String(editing.stock_minimo ?? 0),
-        unidad: editing.unidad || "unidad",
+        categoria_id: String(producto.categoria_id),
+        proveedor_id: producto.proveedor_id ? String(producto.proveedor_id) : "",
+        nombre: producto.nombre,
+        codigo: producto.codigo || "",
+        marca: producto.marca || "",
+        descripcion: producto.descripcion || "",
+        precio_costo: String(producto.precio_costo ?? 0),
+        precio_venta: String(producto.precio_venta ?? 0),
+        stock_actual: String(producto.stock_actual ?? 0),
+        stock_minimo: String(producto.stock_minimo ?? 0),
+        unidad: producto.unidad || "unidad",
       });
       return;
     }
@@ -105,7 +107,7 @@ export function ProductoModal({ open, onClose, editing, onSuccess }: ProductoMod
       stock_minimo: "0",
       unidad: "unidad",
     });
-  }, [editing, reset, open]);
+  }, [editing, reset, open, detalleQuery.data]);
 
   // Auto-focus the barcode field on open (new product) so the scanner lands on it.
   useEffect(() => {

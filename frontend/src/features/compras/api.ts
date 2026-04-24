@@ -2,8 +2,9 @@ import api from "../../shared/lib/axios";
 
 export interface CompraItem {
   id: number;
-  producto_id: number;
-  producto_nombre: string;
+  producto_id?: number | null;
+  producto_nombre?: string | null;
+  descripcion?: string | null;
   codigo?: string | null;
   unidad?: string;
   cantidad: number;
@@ -15,6 +16,9 @@ export interface Compra {
   id: number;
   proveedor_id?: number | null;
   proveedor_nombre?: string | null;
+  origen_tipo?: "directa" | "proveedor" | "casa_repuestos";
+  origen_nombre?: string | null;
+  actualiza_stock?: boolean | number;
   fecha: string;
   total: number;
   notas?: string | null;
@@ -32,10 +36,14 @@ export interface ComprasListResponse {
 
 export interface CreateCompraPayload {
   proveedor_id?: number | null;
+  origen_tipo?: "directa" | "proveedor" | "casa_repuestos";
+  origen_nombre?: string | null;
+  actualiza_stock?: boolean;
   fecha: string;
   notas?: string | null;
   items: Array<{
-    producto_id: number;
+    producto_id?: number | null;
+    descripcion?: string | null;
     cantidad: number;
     precio_unitario: number;
   }>;
