@@ -207,7 +207,11 @@ export function ProveedorDetalle() {
             <div className="mt-3 space-y-3">
               <div>
                 <p className="text-xs text-text-muted">
-                  {cc.activa ? "Deuda actual" : "Cuenta pausada — último saldo"}
+                  {cc.activa
+                    ? Number(cc.saldo) < 0
+                      ? "Saldo a favor"
+                      : "Deuda actual"
+                    : "Cuenta pausada - ultimo saldo"}
                 </p>
                 <p
                   className={`text-3xl font-bold ${
@@ -218,7 +222,7 @@ export function ProveedorDetalle() {
                       : "text-green-400"
                   }`}
                 >
-                  {formatMoney(cc.saldo)}
+                  {formatMoney(Number(cc.saldo) < 0 ? Math.abs(Number(cc.saldo)) : cc.saldo)}
                 </p>
                 {Number(cc.saldo) === 0 && (
                   <p className="text-xs text-green-400">Sin deuda pendiente</p>

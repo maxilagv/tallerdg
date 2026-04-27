@@ -11,9 +11,14 @@ const createProveedorSchema = z.object({
     .optional(),
   condicion_pago: z.string().trim().max(100).nullable().optional(),
   notas: z.string().trim().nullable().optional(),
+  activar_cuenta_corriente: z.coerce.boolean().default(false).optional(),
+  saldo_inicial_cc: z.coerce.number().default(0).optional(),
 });
 
-const updateProveedorSchema = createProveedorSchema.partial();
+const updateProveedorSchema = createProveedorSchema.omit({
+  activar_cuenta_corriente: true,
+  saldo_inicial_cc: true,
+}).partial();
 
 const listProveedoresSchema = z.object({
   q: z.string().trim().optional(),

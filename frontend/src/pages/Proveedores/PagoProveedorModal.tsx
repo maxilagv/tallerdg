@@ -11,7 +11,7 @@ import { Button } from "../../shared/ui/Button";
 import { Input } from "../../shared/ui/Input";
 import { Modal } from "../../shared/ui/Modal";
 import { useToast } from "../../shared/ui/Toast";
-import { formatMoney } from "../../shared/utils/format";
+import { formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 
 const schema = z.object({
@@ -46,7 +46,7 @@ export function PagoProveedorModal({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { monto: undefined, fecha: new Date().toISOString().slice(0, 10), descripcion: "" },
+    defaultValues: { monto: undefined, fecha: toLocalDateInputValue(), descripcion: "" },
   });
 
   const mutation = useMutation({

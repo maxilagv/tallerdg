@@ -14,7 +14,7 @@ const ProveedoresController = {
   },
 
   async crear(req, res) {
-    const data = await ProveedoresService.crear(req.body);
+    const data = await ProveedoresService.crear(req.body, req.user?.id);
     return res.status(201).json({ ok: true, data });
   },
 

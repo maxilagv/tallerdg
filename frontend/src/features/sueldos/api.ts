@@ -78,6 +78,12 @@ export const sueldosApi = {
   abrirPeriodo: (empleadoId: number, payload: { fecha_inicio: string }) =>
     api.post<{ ok: boolean; data: PeriodoSueldo }>(`/sueldos/${empleadoId}/periodos`, payload),
 
+  actualizarPeriodo: (
+    periodoId: number,
+    payload: { fecha_inicio?: string; fecha_fin?: string; sueldo_base?: number }
+  ) =>
+    api.patch<{ ok: boolean; data: PeriodoSueldo }>(`/sueldos/periodos/${periodoId}`, payload),
+
   liquidar: (periodoId: number, payload?: { metodo_pago?: MetodoPago }) =>
     api.post<{ ok: boolean; data: { saldo_pagado: number; gasto_id: number | null } }>(
       `/sueldos/periodos/${periodoId}/liquidar`,

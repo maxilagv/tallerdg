@@ -5,6 +5,7 @@ import {
   CalendarClock,
   ChevronDown,
   ChevronUp,
+  Pencil,
   Settings2,
   Wallet,
 } from "lucide-react";
@@ -15,13 +16,15 @@ import { EmptyState } from "../../shared/ui/EmptyState";
 import { TableSkeleton } from "../../shared/ui/Skeleton";
 import { useToast } from "../../shared/ui/Toast";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
-import { formatDate, formatMoney } from "../../shared/utils/format";
+import { formatDate, formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 import { AdelantoModal } from "./AdelantoModal";
 import { LiquidarModal } from "./LiquidarModal";
+import { PeriodoSueldoModal } from "./PeriodoSueldoModal";
 import { SueldoConfigModal } from "./SueldoConfigModal";
 
 type ModalState =
   | { type: "config"; emp: EmpleadoResumen }
+  | { type: "periodo"; emp: EmpleadoResumen }
   | { type: "adelanto"; emp: EmpleadoResumen }
   | { type: "liquidar"; emp: EmpleadoResumen }
   | null;
@@ -37,7 +40,7 @@ export function SueldosPage() {
   const { add } = useToast();
   const [modal, setModal] = useState<ModalState>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [fechaInicio, setFechaInicio] = useState(new Date().toISOString().slice(0, 10));
+  const [fechaInicio, setFechaInicio] = useState(toLocalDateInputValue());
 
   const query = useQuery({
     queryKey: ["sueldos-resumen"],
@@ -94,6 +97,7 @@ export function SueldosPage() {
               onFechaInicio={setFechaInicio}
               onToggleExpand={() => setExpandedId((value) => (value === emp.id ? null : emp.id))}
               onConfig={() => setModal({ type: "config", emp })}
+              onEditarPeriodo={() => setModal({ type: "periodo", emp })}
               onAdelanto={() => setModal({ type: "adelanto", emp })}
               onLiquidar={() => setModal({ type: "liquidar", emp })}
               onAbrirPeriodo={async () => {
@@ -118,6 +122,16 @@ export function SueldosPage() {
           empleadoId={modal.emp.id}
           empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
           configActual={modal.emp.config}
+        />
+      )}
+
+      {modal?.type === "periodo" && modal.emp.periodo_actual && (
+        <PeriodoSueldoModal
+          open
+          onClose={closeModal}
+          onSuccess={refresh}
+          periodo={modal.emp.periodo_actual}
+          empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
         />
       )}
 
@@ -157,6 +171,7 @@ interface EmpleadoCardProps {
   onFechaInicio: (value: string) => void;
   onToggleExpand: () => void;
   onConfig: () => void;
+  onEditarPeriodo: () => void;
   onAdelanto: () => void;
   onLiquidar: () => void;
   onAbrirPeriodo: () => void;
@@ -171,13 +186,14 @@ function EmpleadoCard({
   onFechaInicio,
   onToggleExpand,
   onConfig,
+  onEditarPeriodo,
   onAdelanto,
   onLiquidar,
   onAbrirPeriodo,
 }: EmpleadoCardProps) {
   const periodo = emp.periodo_actual;
   const config = emp.config;
-  const hoy = new Date().toISOString().slice(0, 10);
+  const hoy = toLocalDateInputValue();
   const vencido = periodo && periodo.fecha_fin < hoy;
 
   const adelantos = periodo?.total_adelantos ?? 0;
@@ -233,6 +249,9 @@ function EmpleadoCard({
 
           {periodo ? (
             <>
+              <Button variant="ghost" size="sm" onClick={onEditarPeriodo}>
+                <Pencil size={15} /> Editar periodo
+              </Button>
               <Button variant="secondary" size="sm" onClick={onAdelanto}>
                 + Adelanto
               </Button>

@@ -4,6 +4,7 @@ const SueldosRepository = require("./sueldos.repository");
 const {
   upsertConfigSchema,
   abrirPeriodoSchema,
+  actualizarPeriodoSchema,
   adelantoSchema,
   historialSchema,
 } = require("./sueldos.validation");
@@ -23,6 +24,14 @@ function parseId(value) {
     throw new AppError("Identificador invalido.", 400, "VALIDATION_ERROR");
   }
   return result.data;
+}
+
+function toDateOnly(value) {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return String(value || "").slice(0, 10);
 }
 
 const SueldosService = {
@@ -79,6 +88,37 @@ const SueldosService = {
     }
 
     return SueldosRepository.abrirPeriodo(id, parsed.data.fecha_inicio);
+  },
+
+  async actualizarPeriodo(periodoId, data) {
+    const id = parseId(periodoId);
+    const periodo = await SueldosRepository.getPeriodoById(id);
+    if (!periodo) {
+      throw new AppError("Periodo no encontrado.", 404, "NOT_FOUND");
+    }
+    if (periodo.estado === "pagado") {
+      throw new AppError("No se puede editar un periodo ya liquidado.", 400, "PERIODO_CERRADO");
+    }
+
+    const parsed = actualizarPeriodoSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message || "Datos invalidos.",
+        400,
+        "VALIDATION_ERROR"
+      );
+    }
+    if (!Object.keys(parsed.data).length) {
+      throw new AppError("Sin campos para actualizar.", 400, "VALIDATION_ERROR");
+    }
+
+    const fechaInicio = parsed.data.fecha_inicio || toDateOnly(periodo.fecha_inicio);
+    const fechaFin = parsed.data.fecha_fin || toDateOnly(periodo.fecha_fin);
+    if (fechaFin < fechaInicio) {
+      throw new AppError("La fecha de cierre no puede ser anterior al inicio.", 400, "VALIDATION_ERROR");
+    }
+
+    return SueldosRepository.updatePeriodo(id, parsed.data);
   },
 
   async liquidar(periodoId, data, empleadoAdminId) {

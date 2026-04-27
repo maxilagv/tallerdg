@@ -19,6 +19,18 @@ const abrirPeriodoSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida"),
 });
 
+const actualizarPeriodoSchema = z.object({
+  fecha_inicio: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida")
+    .optional(),
+  fecha_fin: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida")
+    .optional(),
+  sueldo_base: z.coerce.number().min(0, "El sueldo debe ser mayor o igual a cero").optional(),
+});
+
 const adelantoSchema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a cero"),
   descripcion: z.string().trim().max(300).nullable().optional(),
@@ -30,4 +42,10 @@ const historialSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(12),
 });
 
-module.exports = { upsertConfigSchema, abrirPeriodoSchema, adelantoSchema, historialSchema };
+module.exports = {
+  upsertConfigSchema,
+  abrirPeriodoSchema,
+  actualizarPeriodoSchema,
+  adelantoSchema,
+  historialSchema,
+};

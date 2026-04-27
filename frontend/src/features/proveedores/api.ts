@@ -23,6 +23,11 @@ export interface ProveedoresListResponse {
   limit: number;
 }
 
+export interface CreateProveedorPayload extends Partial<Proveedor> {
+  activar_cuenta_corriente?: boolean;
+  saldo_inicial_cc?: number;
+}
+
 // ── Cuenta Corriente ─────────────────────────────────────────────────────────
 
 export interface CuentaCorriente {
@@ -81,7 +86,7 @@ export const proveedoresApi = {
   obtener: (id: number) =>
     api.get<{ ok: boolean; data: Proveedor }>(`/proveedores/${id}`),
 
-  crear: (payload: Partial<Proveedor>) =>
+  crear: (payload: CreateProveedorPayload) =>
     api.post<{ ok: boolean; data: Proveedor }>("/proveedores", payload),
 
   actualizar: (id: number, payload: Partial<Proveedor>) =>

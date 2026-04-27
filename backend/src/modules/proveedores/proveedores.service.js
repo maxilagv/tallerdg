@@ -51,7 +51,7 @@ const ProveedoresService = {
     return proveedor;
   },
 
-  async crear(data) {
+  async crear(data, empleadoId) {
     const parsed = createProveedorSchema.safeParse(data);
     if (!parsed.success) {
       throw new AppError(
@@ -60,7 +60,43 @@ const ProveedoresService = {
         "VALIDATION_ERROR"
       );
     }
-    return ProveedoresRepository.create(parsed.data);
+
+    const {
+      activar_cuenta_corriente: activarCuentaCorriente = false,
+      saldo_inicial_cc: saldoInicialCC = 0,
+      ...proveedorData
+    } = parsed.data;
+
+    if (!activarCuentaCorriente) {
+      return ProveedoresRepository.create(proveedorData);
+    }
+
+    return db.transaction(async (trx) => {
+      const proveedor = await ProveedoresRepository.create(proveedorData, trx);
+      const saldoInicial = Number(saldoInicialCC) || 0;
+
+      await trx("cuentas_corrientes_proveedores").insert({
+        proveedor_id: proveedor.id,
+        activa: true,
+        saldo: saldoInicial,
+      });
+
+      if (saldoInicial !== 0) {
+        await ProveedoresRepository.insertMovimiento(trx, {
+          proveedor_id: proveedor.id,
+          tipo: saldoInicial > 0 ? "deuda" : "ajuste",
+          monto: Math.abs(saldoInicial),
+          descripcion:
+            saldoInicial > 0
+              ? "Deuda inicial al crear proveedor"
+              : "Saldo a favor inicial al crear proveedor",
+          compra_id: null,
+          empleado_id: empleadoId,
+        });
+      }
+
+      return proveedor;
+    });
   },
 
   async actualizar(id, data) {

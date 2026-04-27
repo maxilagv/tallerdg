@@ -21,6 +21,11 @@ const SueldosController = {
     return res.status(201).json({ ok: true, data });
   },
 
+  async actualizarPeriodo(req, res) {
+    const data = await SueldosService.actualizarPeriodo(req.params.periodoId, req.body);
+    return res.json({ ok: true, data });
+  },
+
   async liquidar(req, res) {
     const data = await SueldosService.liquidar(req.params.periodoId, req.body, req.empleado?.id);
     return res.json({ ok: true, data });

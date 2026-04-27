@@ -10,7 +10,7 @@ import { Input } from "../../shared/ui/Input";
 import { Modal } from "../../shared/ui/Modal";
 import { useToast } from "../../shared/ui/Toast";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
-import { formatMoney } from "../../shared/utils/format";
+import { formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 
 interface ItemLocal {
   producto_id?: number | null;
@@ -30,7 +30,7 @@ interface Props {
 
 export function CompraModal({ open, onClose, onSuccess }: Props) {
   const { add } = useToast();
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(toLocalDateInputValue());
   const [origenTipo, setOrigenTipo] = useState<"directa" | "proveedor" | "casa_repuestos">("directa");
   const [proveedorId, setProveedorId] = useState("");
   const [origenNombre, setOrigenNombre] = useState("");
@@ -159,7 +159,7 @@ export function CompraModal({ open, onClose, onSuccess }: Props) {
   });
 
   const resetForm = () => {
-    setFecha(new Date().toISOString().slice(0, 10));
+    setFecha(toLocalDateInputValue());
     setOrigenTipo("directa");
     setProveedorId("");
     setOrigenNombre("");

@@ -39,6 +39,10 @@ export function ComprasPage() {
       queryClient.invalidateQueries({ queryKey: ["productos"] });
       queryClient.invalidateQueries({ queryKey: ["sidebar-stock-bajo"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-stock-bajo"] });
+      queryClient.invalidateQueries({ queryKey: ["proveedores"] });
+      queryClient.invalidateQueries({ queryKey: ["proveedor-cc"] });
+      queryClient.invalidateQueries({ queryKey: ["proveedor-movimientos"] });
+      queryClient.invalidateQueries({ queryKey: ["compras-proveedor"] });
       add("Compra eliminada.");
     },
     onError: (error) => add(getErrorMessage(error), "error"),

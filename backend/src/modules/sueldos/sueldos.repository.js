@@ -97,6 +97,13 @@ const SueldosRepository = {
     return db("periodos_sueldo").where({ id: periodoId }).first();
   },
 
+  async updatePeriodo(periodoId, data) {
+    await db("periodos_sueldo")
+      .where({ id: periodoId })
+      .update({ ...data, updated_at: db.fn.now() });
+    return this.getPeriodoById(periodoId);
+  },
+
   async getAdelantosDePeriodo(periodoId) {
     return db("adelantos_sueldo").where({ periodo_id: periodoId }).orderBy("created_at", "asc");
   },

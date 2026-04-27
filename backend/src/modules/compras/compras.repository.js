@@ -20,7 +20,7 @@ const ComprasRepository = {
         .offset(offset)
         .select(
           "c.id",
-          "c.fecha",
+          db.raw("DATE_FORMAT(c.fecha, '%Y-%m-%d') as fecha"),
           "c.total",
           "c.notas",
           "c.origen_tipo",
@@ -42,7 +42,20 @@ const ComprasRepository = {
     const compra = await db("compras as c")
       .leftJoin("proveedores as p", "c.proveedor_id", "p.id")
       .where("c.id", id)
-      .select("c.*", "p.nombre as proveedor_nombre")
+      .select(
+        "c.id",
+        "c.proveedor_id",
+        "c.origen_tipo",
+        "c.origen_nombre",
+        "c.actualiza_stock",
+        "c.total",
+        db.raw("DATE_FORMAT(c.fecha, '%Y-%m-%d') as fecha"),
+        "c.notas",
+        "c.empleado_id",
+        "c.created_at",
+        "c.updated_at",
+        "p.nombre as proveedor_nombre"
+      )
       .first();
 
     if (!compra) return null;
@@ -164,24 +177,36 @@ const ComprasRepository = {
 
       // Si había movimiento de CC para esta compra, revertirlo
       if (compra && compra.proveedor_id) {
-        const movCC = await trx("movimientos_cuenta_proveedor")
+        const movimientosCC = await trx("movimientos_cuenta_proveedor")
           .where({ compra_id: id, tipo: "deuda" })
-          .first();
+          .select("id", "monto");
 
-        if (movCC) {
+        if (movimientosCC.length > 0) {
+          const montoRevertir = movimientosCC.reduce(
+            (sum, mov) => sum + Number(mov.monto || 0),
+            0
+          );
+
           // Crear movimiento de reversión y reducir saldo
           await trx("movimientos_cuenta_proveedor").insert({
             proveedor_id: compra.proveedor_id,
             tipo: "ajuste",
-            monto: movCC.monto,
+            monto: montoRevertir,
             descripcion: `Reversión por eliminación de compra #${id}`,
             compra_id: null,
             empleado_id: null,
           });
 
+          await trx("movimientos_cuenta_proveedor")
+            .whereIn(
+              "id",
+              movimientosCC.map((mov) => mov.id)
+            )
+            .update({ compra_id: null });
+
           await trx("cuentas_corrientes_proveedores")
             .where({ proveedor_id: compra.proveedor_id })
-            .decrement("saldo", movCC.monto);
+            .decrement("saldo", montoRevertir);
         }
       }
 

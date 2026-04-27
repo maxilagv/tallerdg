@@ -22,6 +22,7 @@ router.post("/:empleadoId/periodos", requirePermiso("empleados", "w"), SueldosCo
 router.get("/:empleadoId/historial", SueldosController.getHistorial);
 
 // Liquidar un período específico
+router.patch("/periodos/:periodoId", requirePermiso("empleados", "w"), SueldosController.actualizarPeriodo);
 router.post("/periodos/:periodoId/liquidar", requirePermiso("empleados", "w"), SueldosController.liquidar);
 
 // Adelantos

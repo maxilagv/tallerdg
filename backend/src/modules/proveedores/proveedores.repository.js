@@ -47,7 +47,7 @@ const ProveedoresRepository = {
     return db("proveedores").where({ id, activo: 1 }).first();
   },
 
-  async create(data) {
+  async create(data, conn = db) {
     const payload = {
       ...data,
       cuit: data.cuit || null,
@@ -57,8 +57,8 @@ const ProveedoresRepository = {
       notas: data.notas || null,
     };
 
-    const [id] = await db("proveedores").insert(payload);
-    return db("proveedores").where({ id }).first();
+    const [id] = await conn("proveedores").insert(payload);
+    return conn("proveedores").where({ id }).first();
   },
 
   async update(id, data) {

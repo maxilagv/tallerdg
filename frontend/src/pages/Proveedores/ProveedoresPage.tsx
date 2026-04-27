@@ -172,12 +172,18 @@ export function ProveedoresPage() {
                           <div className="space-y-0.5">
                             <Badge
                               variant={
-                                Number(p.saldo_cc) > 0 ? "red" : "green"
+                                Number(p.saldo_cc) > 0
+                                  ? "red"
+                                  : Number(p.saldo_cc) < 0
+                                    ? "yellow"
+                                    : "green"
                               }
                             >
                               {Number(p.saldo_cc) > 0
                                 ? `Debe ${formatMoney(p.saldo_cc ?? 0)}`
-                                : "Al día"}
+                                : Number(p.saldo_cc) < 0
+                                  ? `A favor ${formatMoney(Math.abs(Number(p.saldo_cc ?? 0)))}`
+                                  : "Al dia"}
                             </Badge>
                           </div>
                         ) : (
