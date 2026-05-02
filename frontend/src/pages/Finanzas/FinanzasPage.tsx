@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Download,
@@ -12,8 +12,12 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  PlusCircle,
+  Clock3,
+  CalendarRange,
 } from "lucide-react";
 import { finanzasApi } from "../../features/finanzas/api";
+import type { MovimientoFinanciero } from "../../features/finanzas/api";
 import { Button } from "../../shared/ui/Button";
 import { Card } from "../../shared/ui/Card";
 import { EmptyState } from "../../shared/ui/EmptyState";
@@ -23,6 +27,7 @@ import { formatMoney } from "../../shared/utils/format";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { FinanzasCharts } from "./FinanzasCharts";
 import { MovimientosTitularPanel } from "./MovimientosTitularPanel";
+import { IngresarDineroModal } from "./IngresarDineroModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -33,21 +38,82 @@ function formatLocalDate(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+function addDays(date: Date, amount: number) {
+  const copy = new Date(date);
+  copy.setDate(copy.getDate() + amount);
+  return copy;
+}
+
+function formatFechaCorta(fecha: string) {
+  if (!fecha) return "";
+  const [y, m, d] = fecha.slice(0, 10).split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function formatHora(value?: string | null) {
+  if (!value) return "--:-- hs";
+  const match = String(value).match(/(\d{2}):(\d{2})/);
+  return match ? `${match[1]}:${match[2]} hs` : "--:-- hs";
+}
+
+type PeriodoRapido = "diario" | "semanal" | "quincenal" | "mensual" | "personalizado";
+
+const PERIODOS: Array<{ key: PeriodoRapido; label: string }> = [
+  { key: "diario", label: "Diario" },
+  { key: "semanal", label: "Semanal" },
+  { key: "quincenal", label: "Quincenal" },
+  { key: "mensual", label: "Mensual" },
+  { key: "personalizado", label: "Personalizado" },
+];
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export function FinanzasPage() {
   const { add } = useToast();
   const hoy = formatLocalDate(new Date());
+  const [periodo, setPeriodo] = useState<PeriodoRapido>("diario");
   const [desde, setDesde] = useState(hoy);
   const [hasta, setHasta] = useState(hoy);
   const [exporting, setExporting] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [ingresoDineroOpen, setIngresoDineroOpen] = useState(false);
+  const [cajaIniciaEnCero, setCajaIniciaEnCero] = useState(true);
 
   const fechaInvalida = desde > hasta;
+  const esVistaDiaria = !fechaInvalida && desde === hasta;
+
+  const aplicarPeriodo = (nuevoPeriodo: PeriodoRapido) => {
+    const base = new Date();
+    setPeriodo(nuevoPeriodo);
+
+    if (nuevoPeriodo === "diario") {
+      const dia = formatLocalDate(base);
+      setDesde(dia);
+      setHasta(dia);
+      return;
+    }
+
+    if (nuevoPeriodo === "semanal") {
+      setDesde(formatLocalDate(addDays(base, -6)));
+      setHasta(formatLocalDate(base));
+      return;
+    }
+
+    if (nuevoPeriodo === "quincenal") {
+      setDesde(formatLocalDate(addDays(base, -14)));
+      setHasta(formatLocalDate(base));
+      return;
+    }
+
+    if (nuevoPeriodo === "mensual") {
+      setDesde(formatLocalDate(new Date(base.getFullYear(), base.getMonth(), 1)));
+      setHasta(formatLocalDate(base));
+    }
+  };
 
   const resumenQuery = useQuery({
-    queryKey: ["finanzas-resumen", desde, hasta],
-    queryFn:  () => finanzasApi.resumen({ desde, hasta }),
+    queryKey: ["finanzas-resumen", desde, hasta, cajaIniciaEnCero],
+    queryFn:  () => finanzasApi.resumen({ desde, hasta, caja_inicia_en_cero: cajaIniciaEnCero }),
     staleTime: 0,
     enabled:  !fechaInvalida,
   });
@@ -66,9 +132,17 @@ export function FinanzasPage() {
     enabled:  !fechaInvalida,
   });
 
+  const movimientosDiaQuery = useQuery({
+    queryKey: ["finanzas-movimientos-detalle", desde, hasta],
+    queryFn:  () => finanzasApi.movimientosDetalle({ desde, hasta }),
+    staleTime: 0,
+    enabled:  esVistaDiaria,
+  });
+
   const resumen      = resumenQuery.data?.data.data;
   const porDia       = porDiaQuery.data?.data.data ?? { ingresos: [], gastos: [], compras: [] };
   const porCategoria = porCategoriaQuery.data?.data.data ?? [];
+  const movimientosDia = movimientosDiaQuery.data?.data.data ?? [];
 
   const isLoading =
     resumenQuery.isLoading ||
@@ -84,7 +158,7 @@ export function FinanzasPage() {
     if (fechaInvalida) return;
     setExporting(true);
     try {
-      await finanzasApi.exportarExcel({ desde, hasta });
+      await finanzasApi.exportarExcel({ desde, hasta, caja_inicia_en_cero: cajaIniciaEnCero });
     } catch (err) {
       add(getErrorMessage(err), "error");
     } finally {
@@ -102,8 +176,17 @@ export function FinanzasPage() {
   const cobrosEfectivo = resumen?.cobros_efectivo ?? 0;
   const vrEfectivo     = resumen?.vr_efectivo     ?? 0;
   const gastosEfectivo = resumen?.gastos_efectivo ?? 0;
+  const saldoInicial   = resumen?.saldo_efectivo_inicial ?? 0;
   const saldoArrastre  = resumen?.saldo_efectivo_arrastre ?? 0;
   const netoTitular  = aportes - retiros;
+  const totalIngresosDia = useMemo(
+    () => movimientosDia.filter((mov) => mov.tipo === "ingreso").reduce((sum, mov) => sum + Number(mov.monto), 0),
+    [movimientosDia]
+  );
+  const totalEgresosDia = useMemo(
+    () => movimientosDia.filter((mov) => mov.tipo === "egreso").reduce((sum, mov) => sum + Number(mov.monto), 0),
+    [movimientosDia]
+  );
 
   return (
     <div className="space-y-5">
@@ -112,25 +195,47 @@ export function FinanzasPage() {
         <div>
           <h1 className="text-2xl font-bold text-text">Caja</h1>
           <p className="mt-1 text-sm text-text-muted">
-            Todo lo que entró y salió en el período seleccionado.
+            La caja diaria arranca en 0 y se arma con los movimientos del dia.
           </p>
         </div>
-        <Button onClick={handleExport} loading={exporting} variant="secondary" disabled={fechaInvalida}>
-          <Download size={16} />
-          Exportar Excel
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setIngresoDineroOpen(true)} disabled={fechaInvalida}>
+            <PlusCircle size={16} />
+            Ingresar dinero
+          </Button>
+          <Button onClick={handleExport} loading={exporting} variant="secondary" disabled={fechaInvalida}>
+            <Download size={16} />
+            Exportar Excel
+          </Button>
+        </div>
       </div>
 
       {/* ── Filtro de período ────────────────────────────────────────────────── */}
       <Card>
         <p className="mb-3 text-sm font-medium text-text-muted">Período</p>
+        <div className="mb-4 flex flex-wrap gap-2">
+          {PERIODOS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => aplicarPeriodo(item.key)}
+              className={`rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+                periodo === item.key
+                  ? "border-primary bg-primary text-white"
+                  : "border-border bg-surface-2 text-text-muted hover:text-text"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-text-muted">Desde</label>
             <input
               type="date"
               value={desde}
-              onChange={(e) => setDesde(e.target.value)}
+              onChange={(e) => { setDesde(e.target.value); setPeriodo("personalizado"); }}
               className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
             />
           </div>
@@ -139,11 +244,27 @@ export function FinanzasPage() {
             <input
               type="date"
               value={hasta}
-              onChange={(e) => setHasta(e.target.value)}
+              onChange={(e) => { setHasta(e.target.value); setPeriodo("personalizado"); }}
               className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
             />
           </div>
         </div>
+        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
+          <input
+            type="checkbox"
+            checked={cajaIniciaEnCero}
+            onChange={(e) => setCajaIniciaEnCero(e.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-border bg-surface-3 accent-primary"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-text">Arrancar caja en $0</span>
+            <span className="mt-0.5 block text-xs text-text-muted">
+              {cajaIniciaEnCero
+                ? "Marcado: el saldo inicial queda en cero y no suma el arrastre previo."
+                : "Desmarcado: el saldo inicial suma el arrastre previo."}
+            </span>
+          </span>
+        </label>
         {/* Advertencia de fechas invertidas */}
         {fechaInvalida && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5">
@@ -180,8 +301,22 @@ export function FinanzasPage() {
             cobrosEfectivo={cobrosEfectivo}
             vrEfectivo={vrEfectivo}
             gastosEfectivo={gastosEfectivo}
+            saldoInicial={saldoInicial}
             saldoArrastre={saldoArrastre}
+            cajaIniciaEnCero={cajaIniciaEnCero}
           />
+
+          {esVistaDiaria && (
+            <MovimientosDiariosPanel
+              fecha={desde}
+              movimientos={movimientosDia}
+              isLoading={movimientosDiaQuery.isLoading}
+              isError={movimientosDiaQuery.isError}
+              saldoInicial={saldoInicial}
+              totalIngresos={totalIngresosDia}
+              totalEgresos={totalEgresosDia}
+            />
+          )}
 
           {/* ── 2. Lo que hizo el taller ──────────────────────────────────────
               Tres números que cuentan la historia del período.
@@ -189,7 +324,7 @@ export function FinanzasPage() {
           ─────────────────────────────────────────────────────────────────── */}
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
-              Lo que hizo el taller
+              Balance del periodo
             </p>
             <div className="grid gap-4 md:grid-cols-3">
               {/* Cobrado */}
@@ -292,11 +427,158 @@ export function FinanzasPage() {
           />
         </>
       )}
+      <IngresarDineroModal
+        open={ingresoDineroOpen}
+        fechaInicial={desde}
+        onClose={() => setIngresoDineroOpen(false)}
+      />
     </div>
   );
 }
 
 // ── SaldoCajaCard ─────────────────────────────────────────────────────────────
+
+function getMovimientoLabel(mov: MovimientoFinanciero) {
+  const labels: Record<string, string> = {
+    cobro: "Ingreso por orden",
+    venta_rapida: "Venta rapida",
+    gasto: "Gasto",
+    compra: "Compra",
+    aporte_titular: "Ingreso manual",
+    retiro_titular: "Retiro de caja",
+  };
+  return labels[mov.subtipo] ?? (mov.tipo === "ingreso" ? "Ingreso" : "Egreso");
+}
+
+function MovimientosDiariosPanel({
+  fecha,
+  movimientos,
+  isLoading,
+  isError,
+  saldoInicial,
+  totalIngresos,
+  totalEgresos,
+}: {
+  fecha: string;
+  movimientos: MovimientoFinanciero[];
+  isLoading: boolean;
+  isError: boolean;
+  saldoInicial: number;
+  totalIngresos: number;
+  totalEgresos: number;
+}) {
+  const saldoFinal = saldoInicial + totalIngresos - totalEgresos;
+
+  return (
+    <Card>
+      <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div>
+          <div className="mb-1 flex items-center gap-2">
+            <CalendarRange size={15} className="text-primary" />
+            <h2 className="text-base font-semibold text-text">Movimientos del dia</h2>
+          </div>
+          <p className="text-xs text-text-muted">
+            {formatFechaCorta(fecha)} - ingresos y egresos ordenados por hora.
+          </p>
+        </div>
+        <div className={`rounded-xl px-3 py-2 ${saldoFinal >= 0 ? "bg-green-500/10" : "bg-red-500/10"}`}>
+          <p className="text-[10px] uppercase tracking-wide text-text-muted">Saldo final</p>
+          <p className={`text-sm font-bold ${saldoFinal >= 0 ? "text-green-300" : "text-red-300"}`}>
+            {saldoFinal >= 0 ? "+" : ""}{formatMoney(saldoFinal)}
+          </p>
+        </div>
+      </div>
+
+      {isLoading && (
+        <div className="space-y-2">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="h-14 animate-pulse rounded-xl bg-surface-2" />
+          ))}
+        </div>
+      )}
+
+      {isError && !isLoading && (
+        <p className="rounded-xl border border-border bg-surface-2 px-4 py-5 text-center text-sm text-text-muted">
+          No se pudieron cargar los movimientos del dia.
+        </p>
+      )}
+
+      {!isLoading && !isError && movimientos.length === 0 && (
+        <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center">
+          <p className="text-sm font-medium text-text">Caja sin movimientos</p>
+          <p className="mt-1 text-xs text-text-muted">El dia empieza en 0. Registra ventas, gastos o ingresos manuales.</p>
+        </div>
+      )}
+
+      {!isLoading && !isError && movimientos.length > 0 && (
+        <>
+          <div className="overflow-hidden rounded-xl border border-border">
+            {movimientos.map((mov, index) => {
+              const esIngreso = mov.tipo === "ingreso";
+              const sign = esIngreso ? "+" : "-";
+              return (
+                <div
+                  key={`${mov.subtipo}-${mov.referencia}-${mov.fecha_hora ?? index}`}
+                  className="grid gap-3 border-b border-border/50 px-4 py-3 last:border-b-0 md:grid-cols-[1fr_auto]"
+                >
+                  <div className="min-w-0">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          esIngreso ? "bg-green-500/15 text-green-300" : "bg-red-500/15 text-red-300"
+                        }`}
+                      >
+                        {getMovimientoLabel(mov)}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+                        <Clock3 size={12} />
+                        {formatHora(mov.fecha_hora ?? mov.registrado_at)}
+                      </span>
+                    </div>
+                    <p className="truncate text-sm font-medium text-text">{mov.descripcion || mov.referencia}</p>
+                    <p className="truncate text-xs text-text-muted">{mov.referencia}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 md:justify-end">
+                    {esIngreso ? (
+                      <TrendingUp size={15} className="text-green-400" />
+                    ) : (
+                      <TrendingDown size={15} className="text-red-400" />
+                    )}
+                    <p className={`text-sm font-bold ${esIngreso ? "text-green-300" : "text-red-300"}`}>
+                      {sign}{formatMoney(Number(mov.monto))}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-4 text-sm font-semibold text-text">Resumen del dia</p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-4">
+            <div className="rounded-xl bg-surface-2/60 p-3">
+              <p className="text-xs text-text-muted">Inicio de caja</p>
+              <p className="mt-1 text-lg font-bold text-text">{formatMoney(saldoInicial)}</p>
+            </div>
+            <div className="rounded-xl bg-green-500/10 p-3">
+              <p className="text-xs text-green-400">Total ingresado</p>
+              <p className="mt-1 text-lg font-bold text-green-300">{formatMoney(totalIngresos)}</p>
+            </div>
+            <div className="rounded-xl bg-red-500/10 p-3">
+              <p className="text-xs text-red-400">Total gastado</p>
+              <p className="mt-1 text-lg font-bold text-red-300">{formatMoney(totalEgresos)}</p>
+            </div>
+            <div className={`rounded-xl p-3 ${saldoFinal >= 0 ? "bg-blue-500/10" : "bg-red-500/10"}`}>
+              <p className={`text-xs ${saldoFinal >= 0 ? "text-blue-400" : "text-red-400"}`}>Saldo final del dia</p>
+              <p className={`mt-1 text-lg font-bold ${saldoFinal >= 0 ? "text-blue-300" : "text-red-300"}`}>
+                {saldoFinal >= 0 ? "+" : ""}{formatMoney(saldoFinal)}
+              </p>
+            </div>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
 
 function SaldoCajaCard({
   saldo,
@@ -306,7 +588,9 @@ function SaldoCajaCard({
   cobrosEfectivo,
   vrEfectivo,
   gastosEfectivo,
+  saldoInicial,
   saldoArrastre,
+  cajaIniciaEnCero,
 }: {
   saldo:           number;
   resultado:       number;
@@ -315,7 +599,9 @@ function SaldoCajaCard({
   cobrosEfectivo:  number;
   vrEfectivo:      number;
   gastosEfectivo:  number;
+  saldoInicial:    number;
   saldoArrastre:   number;
+  cajaIniciaEnCero: boolean;
 }) {
   const positivo   = saldo >= 0;
   const hayTitular = aportes > 0 || retiros > 0;
@@ -341,7 +627,7 @@ function SaldoCajaCard({
           {positivo ? "+" : ""}{formatMoney(saldo)}
         </p>
         <p className="mt-1 text-xs text-text-muted">
-          Cobros y gastos en efectivo, mÃ¡s tus aportes y retiros.
+          Cobros y gastos en efectivo, mas tus aportes y retiros.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -363,9 +649,15 @@ function SaldoCajaCard({
               <p className="text-sm font-bold text-red-300">-{formatMoney(gastosEfectivo)}</p>
             </div>
           )}
-          {saldoArrastre !== 0 && (
+          <div className="rounded-xl bg-surface-2/60 px-3 py-2">
+            <p className="text-[10px] text-text-muted">
+              {cajaIniciaEnCero ? "Inicio marcado" : "Arrastre previo"}
+            </p>
+            <p className="text-sm font-bold text-text">{formatMoney(saldoInicial)}</p>
+          </div>
+          {cajaIniciaEnCero && saldoArrastre !== 0 && (
             <div className="rounded-xl bg-surface-2/60 px-3 py-2">
-              <p className="text-[10px] text-text-muted">Arrastre previo</p>
+              <p className="text-[10px] text-text-muted">Arrastre ignorado</p>
               <p className={`text-sm font-bold ${saldoArrastre >= 0 ? "text-blue-300" : "text-red-300"}`}>
                 {saldoArrastre >= 0 ? "+" : ""}{formatMoney(saldoArrastre)}
               </p>

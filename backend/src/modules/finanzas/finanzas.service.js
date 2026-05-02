@@ -3,6 +3,7 @@ const AppError = require("../../shared/errors/AppError");
 const FinanzasRepository = require("./finanzas.repository");
 const ConfiguracionService = require("../configuracion/configuracion.service");
 const {
+  resumenSchema,
   rangoSchema,
   porDiaSchema,
   movimientosSchema,
@@ -249,9 +250,11 @@ const FinanzasService = {
   // ── Consultas de reporte ──────────────────────────────────────────────────
 
   async resumen(query) {
-    const parsed = rangoSchema.safeParse(query);
+    const parsed = resumenSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getResumen(parsed.data.desde, parsed.data.hasta);
+    return FinanzasRepository.getResumen(parsed.data.desde, parsed.data.hasta, {
+      cajaIniciaEnCero: parsed.data.caja_inicia_en_cero,
+    });
   },
 
   async porDia(query) {
@@ -279,6 +282,12 @@ const FinanzasService = {
   },
 
   // ── Análisis inteligente ──────────────────────────────────────────────────
+
+  async movimientosDetalle(query) {
+    const parsed = rangoSchema.safeParse(query);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parametros invalidos.", 400, "VALIDATION_ERROR");
+    return FinanzasRepository.getMovimientosDetalle(parsed.data.desde, parsed.data.hasta);
+  },
 
   async analisis(query) {
     const parsed = rangoSchema.safeParse(query);
@@ -322,9 +331,9 @@ const FinanzasService = {
 
   // ── Export Excel ────────────────────────────────────────────────────────────
   async exportarExcel(query) {
-    const parsed = rangoSchema.safeParse(query);
+    const parsed = resumenSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Fechas inválidas.", 400, "VALIDATION_ERROR");
-    const { desde, hasta } = parsed.data;
+    const { desde, hasta, caja_inicia_en_cero: cajaIniciaEnCero } = parsed.data;
 
     // Límite de 6 meses para evitar timeouts y archivos excesivamente grandes.
     const SEIS_MESES_MS = 6 * 30 * 24 * 60 * 60 * 1000;
@@ -337,7 +346,7 @@ const FinanzasService = {
     }
 
     const [resumen, movimientos, porCategoria, porDia, analisis, config] = await Promise.all([
-      FinanzasRepository.getResumen(desde, hasta),
+      FinanzasRepository.getResumen(desde, hasta, { cajaIniciaEnCero }),
       FinanzasRepository.getMovimientosTodos(desde, hasta),
       FinanzasRepository.getGastosPorCategoria(desde, hasta),
       FinanzasRepository.getPorDia(desde, hasta),

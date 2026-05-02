@@ -9,10 +9,29 @@ const refineRangoMsg = {
   path: ["desde"],
 };
 
+const booleanQueryDefaultTrue = z.preprocess((value) => {
+  if (value === undefined) return true;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["1", "true", "si", "on"].includes(normalized)) return true;
+    if (["0", "false", "no", "off"].includes(normalized)) return false;
+  }
+  return value;
+}, z.boolean());
+
 const rangoSchema = z
   .object({
     desde: z.string().min(1, "La fecha desde es obligatoria"),
     hasta: z.string().min(1, "La fecha hasta es obligatoria"),
+  })
+  .refine(refineRango, refineRangoMsg);
+
+const resumenSchema = z
+  .object({
+    desde: z.string().min(1, "La fecha desde es obligatoria"),
+    hasta: z.string().min(1, "La fecha hasta es obligatoria"),
+    caja_inicia_en_cero: booleanQueryDefaultTrue,
   })
   .refine(refineRango, refineRangoMsg);
 
@@ -73,6 +92,7 @@ const movimientosTitularListSchema = z.object({
 });
 
 module.exports = {
+  resumenSchema,
   rangoSchema,
   porDiaSchema,
   movimientosSchema,

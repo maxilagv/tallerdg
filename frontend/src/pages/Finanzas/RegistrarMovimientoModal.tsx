@@ -87,6 +87,7 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
 
   const invalidar = () => {
     qc.invalidateQueries({ queryKey: ["finanzas-resumen"] });
+    qc.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
     qc.invalidateQueries({ queryKey: ["finanzas-movimientos-titular"] });
     qc.invalidateQueries({ queryKey: ["finanzas-analisis"] });
     qc.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });

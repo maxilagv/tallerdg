@@ -31,6 +31,11 @@ const FinanzasController = {
 
   // ── Análisis inteligente ─────────────────────────────────────────────────────
 
+  async movimientosDetalle(req, res) {
+    const data = await FinanzasService.movimientosDetalle(req.query);
+    return res.json({ ok: true, data });
+  },
+
   async analisis(req, res) {
     const data = await FinanzasService.analisis(req.query);
     return res.json({ ok: true, data });
@@ -44,7 +49,7 @@ const FinanzasController = {
   },
 
   async crearMovimientoTitular(req, res) {
-    const data = await FinanzasService.crearMovimientoTitular(req.body, req.usuario?.id);
+    const data = await FinanzasService.crearMovimientoTitular(req.body, req.user?.id);
     return res.status(201).json({ ok: true, data });
   },
 

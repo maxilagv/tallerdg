@@ -23,7 +23,8 @@ const db = require("../../shared/db/knex");
 const FinanzasRepository = {
 
   // ── Resumen del período ───────────────────────────────────────────────────
-  async getResumen(desde, hasta) {
+  async getResumen(desde, hasta, options = {}) {
+    const cajaIniciaEnCero = options.cajaIniciaEnCero !== false;
     const [
       cobros,
       cobrosPorMetodo,
@@ -182,9 +183,11 @@ const FinanzasRepository = {
       totalAportesArrastre -
       totalRetirosArrastre;
 
-    // Saldo físico en caja = solo lo que entró/salió en efectivo
+    const saldoEfectivoInicial = cajaIniciaEnCero ? 0 : saldoEfectivoArrastre;
+
+    // Saldo físico en caja = inicio elegido + lo que entró/salió en efectivo
     const saldoEfectivo =
-      saldoEfectivoArrastre +
+      saldoEfectivoInicial +
       totalCobrosEfectivo +
       totalVREfectivo -
       totalGastosEfectivo +
@@ -211,6 +214,8 @@ const FinanzasRepository = {
       cobros_efectivo:       totalCobrosEfectivo,
       vr_efectivo:           totalVREfectivo,
       gastos_efectivo:       totalGastosEfectivo,
+      caja_inicia_en_cero:    cajaIniciaEnCero,
+      saldo_efectivo_inicial: saldoEfectivoInicial,
       saldo_efectivo_arrastre: saldoEfectivoArrastre,
       saldo_efectivo:        saldoEfectivo,
       // ── Compatibilidad ────────────────────────────────────────────────────
@@ -374,6 +379,89 @@ const FinanzasRepository = {
     ]);
 
     return { rows, total: Number(countRows?.[0]?.total) || 0, page, limit };
+  },
+
+  // ── Detalle cronologico de movimientos (para vista diaria de caja) ───────
+  async getMovimientosDetalle(desde, hasta) {
+    const sql = `
+      SELECT * FROM (
+        SELECT 'ingreso' AS tipo, 'cobro' AS subtipo,
+               o.numero AS referencia, p.monto AS monto, DATE(p.created_at) AS fecha,
+               p.created_at AS fecha_hora, p.created_at AS registrado_at,
+               CONCAT(c.apellido, ', ', c.nombre, ' - ', v.patente, ' - ', p.metodo) AS descripcion,
+               p.metodo AS metodo_cobro
+        FROM pagos p
+        JOIN ordenes o ON p.orden_id = o.id JOIN clientes c ON o.cliente_id = c.id
+        JOIN vehiculos v ON o.vehiculo_id = v.id
+        WHERE p.anulado_at IS NULL AND p.created_at BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT 'ingreso', 'venta_rapida',
+               CONCAT('Caja Rapida #', vr.id), vr.total, vr.fecha,
+               TIMESTAMP(vr.fecha, COALESCE(TIME(vr.created_at), '00:00:00')) AS fecha_hora,
+               vr.created_at AS registrado_at,
+               CONCAT('Venta rapida',
+                 CASE WHEN vi.items IS NOT NULL AND vi.items != ''
+                      THEN CONCAT(' - ', vi.items) ELSE '' END,
+                 ' - ',
+                 CASE vr.medio_pago WHEN 'efectivo' THEN 'Efectivo'
+                   WHEN 'tarjeta' THEN 'Tarjeta' WHEN 'transferencia' THEN 'Transferencia'
+                   ELSE 'Otro' END,
+                 CASE WHEN vr.notas IS NOT NULL AND vr.notas != ''
+                      THEN CONCAT(' - ', vr.notas) ELSE '' END),
+               vr.medio_pago
+        FROM ventas_rapidas vr
+        LEFT JOIN (
+          SELECT venta_id, GROUP_CONCAT(producto_nombre ORDER BY id SEPARATOR ', ') AS items
+          FROM venta_rapida_items
+          GROUP BY venta_id
+        ) vi ON vi.venta_id = vr.id
+        WHERE vr.fecha BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT 'egreso', 'gasto', cg.nombre, g.monto, g.fecha,
+               TIMESTAMP(g.fecha, COALESCE(TIME(g.created_at), '00:00:00')) AS fecha_hora,
+               g.created_at AS registrado_at,
+               g.descripcion, g.metodo_pago
+        FROM gastos g JOIN categorias_gastos cg ON g.categoria_id = cg.id
+        WHERE g.activo = 1 AND g.fecha BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT 'egreso', 'compra',
+               COALESCE(p.nombre, 'Sin proveedor'), c.total, c.fecha,
+               TIMESTAMP(c.fecha, COALESCE(TIME(c.created_at), '00:00:00')) AS fecha_hora,
+               c.created_at AS registrado_at,
+               CONCAT('Compra a ', COALESCE(p.nombre, 'Sin proveedor')), NULL
+        FROM compras c LEFT JOIN proveedores p ON c.proveedor_id = p.id
+        WHERE c.fecha BETWEEN ? AND ?
+
+        UNION ALL
+
+        SELECT
+          CASE mc.tipo WHEN 'aporte_titular' THEN 'ingreso' ELSE 'egreso' END,
+          mc.tipo,
+          CASE mc.tipo WHEN 'aporte_titular' THEN 'Ingreso manual'
+                       ELSE 'Retiro de caja' END,
+          mc.monto, mc.fecha,
+          TIMESTAMP(mc.fecha, COALESCE(TIME(mc.created_at), '00:00:00')) AS fecha_hora,
+          mc.created_at AS registrado_at,
+          CONCAT(mc.concepto,
+            CASE WHEN mc.referencia IS NOT NULL AND mc.referencia != ''
+                 THEN CONCAT(' - Ref: ', mc.referencia) ELSE '' END),
+          NULL
+        FROM movimientos_caja mc WHERE mc.activo = 1 AND mc.fecha BETWEEN ? AND ?
+
+      ) mov ORDER BY fecha ASC, fecha_hora ASC, tipo ASC
+    `;
+
+    const [rows] = await db.raw(sql, [
+      `${desde} 00:00:00`, `${hasta} 23:59:59`,
+      desde, hasta, desde, hasta, desde, hasta, desde, hasta,
+    ]);
+    return rows;
   },
 
   // ── Todos los movimientos sin paginación (para export Excel) ─────────────

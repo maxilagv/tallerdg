@@ -27,6 +27,8 @@ export interface FinanzasResumen {
   cobros_efectivo:       number;
   vr_efectivo:           number;
   gastos_efectivo:       number;
+  caja_inicia_en_cero:    boolean;
+  saldo_efectivo_inicial: number;
   saldo_efectivo_arrastre: number;
   saldo_efectivo:        number;
   // Estadísticas
@@ -80,6 +82,8 @@ export interface MovimientoFinanciero {
   referencia:   string;
   monto:        number;
   fecha:        string;
+  fecha_hora?:  string;
+  registrado_at?: string | null;
   descripcion:  string;
   /**
    * Método de pago del cobro o venta rápida.
@@ -162,7 +166,7 @@ export interface AnalisisCaja {
 
 export const finanzasApi = {
   // Reportes
-  resumen: (params: { desde: string; hasta: string }) =>
+  resumen: (params: { desde: string; hasta: string; caja_inicia_en_cero?: boolean }) =>
     api.get<{ ok: boolean; data: FinanzasResumen }>("/finanzas/resumen", { params }),
 
   porDia: (params: { desde: string; hasta: string }) =>
@@ -176,6 +180,9 @@ export const finanzasApi = {
 
   movimientos: (params: { desde: string; hasta: string; page?: number; limit?: number }) =>
     api.get<{ ok: boolean; data: MovimientosFinancierosResponse }>("/finanzas/movimientos", { params }),
+
+  movimientosDetalle: (params: { desde: string; hasta: string }) =>
+    api.get<{ ok: boolean; data: MovimientoFinanciero[] }>("/finanzas/movimientos-detalle", { params }),
 
   // Análisis inteligente
   analisis: (params: { desde: string; hasta: string }) =>
@@ -195,7 +202,7 @@ export const finanzasApi = {
     api.delete<{ ok: boolean }>(`/finanzas/movimientos-titular/${id}`),
 
   // Export Excel
-  exportarExcel: async (params: { desde: string; hasta: string }) => {
+  exportarExcel: async (params: { desde: string; hasta: string; caja_inicia_en_cero?: boolean }) => {
     const response = await api.get("/finanzas/exportar", { params, responseType: "blob" });
     const url  = URL.createObjectURL(response.data as Blob);
     const link = document.createElement("a");

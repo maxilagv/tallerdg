@@ -11,6 +11,7 @@ router.get("/resumen",              requirePermiso("finanzas", "r"), FinanzasCon
 router.get("/por-dia",              requirePermiso("finanzas", "r"), FinanzasController.porDia);
 router.get("/gastos-por-categoria", requirePermiso("finanzas", "r"), FinanzasController.gastosPorCategoria);
 router.get("/movimientos",          requirePermiso("finanzas", "r"), FinanzasController.movimientos);
+router.get("/movimientos-detalle",  requirePermiso("finanzas", "r"), FinanzasController.movimientosDetalle);
 router.get("/movimientos-mes",      requirePermiso("finanzas", "r"), FinanzasController.movimientosMes);
 
 // ── Análisis inteligente ──────────────────────────────────────────────────────
