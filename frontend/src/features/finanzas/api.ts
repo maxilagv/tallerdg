@@ -28,6 +28,9 @@ export interface FinanzasResumen {
   vr_efectivo:           number;
   gastos_efectivo:       number;
   caja_inicia_en_cero:    boolean;
+  caja_reset_activo:      boolean;
+  caja_reset_fecha:       string | null;
+  caja_reset_at:          string | null;
   saldo_efectivo_inicial: number;
   saldo_efectivo_arrastre: number;
   saldo_efectivo:        number;
@@ -131,6 +134,14 @@ export interface MovimientoTitularPayload {
   notas?:     string | null;
 }
 
+export interface CajaResetStatus {
+  usado:          boolean;
+  puede_resetear: boolean;
+  fecha:          string | null;
+  reset_at:       string | null;
+  empleado_id:    number | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPOS — Análisis Inteligente
 // ─────────────────────────────────────────────────────────────────────────────
@@ -187,6 +198,12 @@ export const finanzasApi = {
   // Análisis inteligente
   analisis: (params: { desde: string; hasta: string }) =>
     api.get<{ ok: boolean; data: AnalisisCaja }>("/finanzas/analisis", { params }),
+
+  resetCajaEstado: () =>
+    api.get<{ ok: boolean; data: CajaResetStatus }>("/finanzas/reset-caja"),
+
+  resetCaja: (payload: { fecha: string }) =>
+    api.post<{ ok: boolean; data: CajaResetStatus }>("/finanzas/reset-caja", payload),
 
   // Movimientos del Titular
   movimientosTitular: (params?: { desde?: string; hasta?: string; page?: number; limit?: number }) =>

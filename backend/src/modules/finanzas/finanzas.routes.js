@@ -17,6 +17,10 @@ router.get("/movimientos-mes",      requirePermiso("finanzas", "r"), FinanzasCon
 // ── Análisis inteligente ──────────────────────────────────────────────────────
 router.get("/analisis",             requirePermiso("finanzas", "r"), FinanzasController.analisis);
 
+// ── Reset de caja (un solo uso) ───────────────────────────────────────────────
+router.get("/reset-caja",            requirePermiso("finanzas", "r"), FinanzasController.estadoResetCaja);
+router.post("/reset-caja",           requirePermiso("finanzas", "w"), FinanzasController.resetCaja);
+
 // ── Movimientos del Titular (CRUD) ────────────────────────────────────────────
 router.get("/movimientos-titular",        requirePermiso("finanzas", "r"), FinanzasController.listarMovimientosTitular);
 router.post("/movimientos-titular",       requirePermiso("finanzas", "w"), FinanzasController.crearMovimientoTitular);

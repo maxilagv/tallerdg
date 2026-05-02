@@ -41,6 +41,16 @@ const FinanzasController = {
     return res.json({ ok: true, data });
   },
 
+  async estadoResetCaja(req, res) {
+    const data = await FinanzasService.estadoResetCaja();
+    return res.json({ ok: true, data });
+  },
+
+  async resetCaja(req, res) {
+    const data = await FinanzasService.resetCaja(req.body, req.user?.id);
+    return res.status(201).json({ ok: true, data });
+  },
+
   // ── CRUD Movimientos del Titular ─────────────────────────────────────────────
 
   async listarMovimientosTitular(req, res) {

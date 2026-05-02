@@ -91,6 +91,10 @@ const movimientosTitularListSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
+const resetCajaSchema = z.object({
+  fecha: z.string().min(1, "La fecha del reset es obligatoria."),
+});
+
 module.exports = {
   resumenSchema,
   rangoSchema,
@@ -100,4 +104,5 @@ module.exports = {
   movimientoTitularCreateSchema,
   movimientoTitularUpdateSchema,
   movimientosTitularListSchema,
+  resetCajaSchema,
 };

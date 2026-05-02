@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Download,
   TrendingUp,
@@ -15,9 +15,11 @@ import {
   PlusCircle,
   Clock3,
   CalendarRange,
+  RotateCcw,
+  ShieldCheck,
 } from "lucide-react";
 import { finanzasApi } from "../../features/finanzas/api";
-import type { MovimientoFinanciero } from "../../features/finanzas/api";
+import type { CajaResetStatus, MovimientoFinanciero } from "../../features/finanzas/api";
 import { Button } from "../../shared/ui/Button";
 import { Card } from "../../shared/ui/Card";
 import { EmptyState } from "../../shared/ui/EmptyState";
@@ -70,6 +72,7 @@ const PERIODOS: Array<{ key: PeriodoRapido; label: string }> = [
 
 export function FinanzasPage() {
   const { add } = useToast();
+  const queryClient = useQueryClient();
   const hoy = formatLocalDate(new Date());
   const [periodo, setPeriodo] = useState<PeriodoRapido>("diario");
   const [desde, setDesde] = useState(hoy);
@@ -77,7 +80,7 @@ export function FinanzasPage() {
   const [exporting, setExporting] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
   const [ingresoDineroOpen, setIngresoDineroOpen] = useState(false);
-  const [cajaIniciaEnCero, setCajaIniciaEnCero] = useState(true);
+  const [confirmandoReset, setConfirmandoReset] = useState(false);
 
   const fechaInvalida = desde > hasta;
   const esVistaDiaria = !fechaInvalida && desde === hasta;
@@ -112,10 +115,16 @@ export function FinanzasPage() {
   };
 
   const resumenQuery = useQuery({
-    queryKey: ["finanzas-resumen", desde, hasta, cajaIniciaEnCero],
-    queryFn:  () => finanzasApi.resumen({ desde, hasta, caja_inicia_en_cero: cajaIniciaEnCero }),
+    queryKey: ["finanzas-resumen", desde, hasta],
+    queryFn:  () => finanzasApi.resumen({ desde, hasta }),
     staleTime: 0,
     enabled:  !fechaInvalida,
+  });
+
+  const resetCajaQuery = useQuery({
+    queryKey: ["finanzas-reset-caja"],
+    queryFn:  finanzasApi.resetCajaEstado,
+    staleTime: 30_000,
   });
 
   const porDiaQuery = useQuery({
@@ -158,13 +167,30 @@ export function FinanzasPage() {
     if (fechaInvalida) return;
     setExporting(true);
     try {
-      await finanzasApi.exportarExcel({ desde, hasta, caja_inicia_en_cero: cajaIniciaEnCero });
+      await finanzasApi.exportarExcel({ desde, hasta });
     } catch (err) {
       add(getErrorMessage(err), "error");
     } finally {
       setExporting(false);
     }
   };
+
+  const resetCajaMutation = useMutation({
+    mutationFn: () => finanzasApi.resetCaja({ fecha: hoy }),
+    onSuccess: () => {
+      setConfirmandoReset(false);
+      queryClient.invalidateQueries({ queryKey: ["finanzas-reset-caja"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-resumen"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-por-dia"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-categorias"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-titular"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-analisis"] });
+      add("Caja iniciada en cero.", "success");
+    },
+    onError: (err) => add(getErrorMessage(err), "error"),
+  });
 
   const cobrado      = resumen?.ingresos        ?? 0;
   const gastos       = resumen?.gastos          ?? 0;
@@ -178,6 +204,7 @@ export function FinanzasPage() {
   const gastosEfectivo = resumen?.gastos_efectivo ?? 0;
   const saldoInicial   = resumen?.saldo_efectivo_inicial ?? 0;
   const saldoArrastre  = resumen?.saldo_efectivo_arrastre ?? 0;
+  const resetCaja      = resetCajaQuery.data?.data.data;
   const netoTitular  = aportes - retiros;
   const totalIngresosDia = useMemo(
     () => movimientosDia.filter((mov) => mov.tipo === "ingreso").reduce((sum, mov) => sum + Number(mov.monto), 0),
@@ -249,22 +276,15 @@ export function FinanzasPage() {
             />
           </div>
         </div>
-        <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-primary/30 bg-primary/10 px-4 py-3">
-          <input
-            type="checkbox"
-            checked={cajaIniciaEnCero}
-            onChange={(e) => setCajaIniciaEnCero(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-border bg-surface-3 accent-primary"
-          />
-          <span>
-            <span className="block text-sm font-semibold text-text">Arrancar caja en $0</span>
-            <span className="mt-0.5 block text-xs text-text-muted">
-              {cajaIniciaEnCero
-                ? "Marcado: el saldo inicial queda en cero y no suma el arrastre previo."
-                : "Desmarcado: el saldo inicial suma el arrastre previo."}
-            </span>
-          </span>
-        </label>
+        <CajaResetPanel
+          estado={resetCaja}
+          fecha={hoy}
+          confirmando={confirmandoReset}
+          loading={resetCajaMutation.isPending}
+          onStart={() => setConfirmandoReset(true)}
+          onCancel={() => setConfirmandoReset(false)}
+          onConfirm={() => resetCajaMutation.mutate()}
+        />
         {/* Advertencia de fechas invertidas */}
         {fechaInvalida && (
           <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2.5">
@@ -303,7 +323,7 @@ export function FinanzasPage() {
             gastosEfectivo={gastosEfectivo}
             saldoInicial={saldoInicial}
             saldoArrastre={saldoArrastre}
-            cajaIniciaEnCero={cajaIniciaEnCero}
+            cajaResetActivo={Boolean(resumen?.caja_reset_activo)}
           />
 
           {esVistaDiaria && (
@@ -437,6 +457,71 @@ export function FinanzasPage() {
 }
 
 // ── SaldoCajaCard ─────────────────────────────────────────────────────────────
+
+function CajaResetPanel({
+  estado,
+  fecha,
+  confirmando,
+  loading,
+  onStart,
+  onCancel,
+  onConfirm,
+}: {
+  estado?: CajaResetStatus;
+  fecha: string;
+  confirmando: boolean;
+  loading: boolean;
+  onStart: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const usado = Boolean(estado?.usado);
+
+  return (
+    <div className={`mt-4 rounded-xl border px-4 py-3 ${usado ? "border-green-500/25 bg-green-500/10" : "border-amber-500/25 bg-amber-500/10"}`}>
+      <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+        <div className="flex items-start gap-3">
+          <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${usado ? "bg-green-500/15" : "bg-amber-500/15"}`}>
+            {usado ? (
+              <ShieldCheck size={18} className="text-green-300" />
+            ) : (
+              <RotateCcw size={18} className="text-amber-300" />
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-text">
+              {usado ? "Caja iniciada en cero" : "Iniciar caja en cero"}
+            </p>
+            <p className="mt-0.5 text-xs text-text-muted">
+              {usado
+                ? `Aplicado desde ${formatFechaCorta(estado?.fecha || fecha)}. Los datos anteriores siguen guardados.`
+                : `Un solo uso: deja la caja desde ${formatFechaCorta(fecha)} en cero sin borrar clientes, ordenes, stock ni deudas.`}
+            </p>
+          </div>
+        </div>
+
+        {!usado && (
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {confirmando && (
+              <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={loading}>
+                Cancelar
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant={confirmando ? "danger" : "secondary"}
+              size="sm"
+              onClick={confirmando ? onConfirm : onStart}
+              loading={loading}
+            >
+              {confirmando ? "Confirmar reset" : "Iniciar en $0"}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function getMovimientoLabel(mov: MovimientoFinanciero) {
   const labels: Record<string, string> = {
@@ -590,7 +675,7 @@ function SaldoCajaCard({
   gastosEfectivo,
   saldoInicial,
   saldoArrastre,
-  cajaIniciaEnCero,
+  cajaResetActivo,
 }: {
   saldo:           number;
   resultado:       number;
@@ -601,7 +686,7 @@ function SaldoCajaCard({
   gastosEfectivo:  number;
   saldoInicial:    number;
   saldoArrastre:   number;
-  cajaIniciaEnCero: boolean;
+  cajaResetActivo: boolean;
 }) {
   const positivo   = saldo >= 0;
   const hayTitular = aportes > 0 || retiros > 0;
@@ -651,11 +736,11 @@ function SaldoCajaCard({
           )}
           <div className="rounded-xl bg-surface-2/60 px-3 py-2">
             <p className="text-[10px] text-text-muted">
-              {cajaIniciaEnCero ? "Inicio marcado" : "Arrastre previo"}
+              {cajaResetActivo ? "Inicio por reset" : "Inicio del dia"}
             </p>
             <p className="text-sm font-bold text-text">{formatMoney(saldoInicial)}</p>
           </div>
-          {cajaIniciaEnCero && saldoArrastre !== 0 && (
+          {saldoArrastre !== 0 && (
             <div className="rounded-xl bg-surface-2/60 px-3 py-2">
               <p className="text-[10px] text-text-muted">Arrastre ignorado</p>
               <p className={`text-sm font-bold ${saldoArrastre >= 0 ? "text-blue-300" : "text-red-300"}`}>

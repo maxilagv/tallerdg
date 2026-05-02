@@ -2,6 +2,7 @@ const ExcelJS = require("exceljs");
 const AppError = require("../../shared/errors/AppError");
 const FinanzasRepository = require("./finanzas.repository");
 const ConfiguracionService = require("../configuracion/configuracion.service");
+const ConfiguracionRepository = require("../configuracion/configuracion.repository");
 const {
   resumenSchema,
   rangoSchema,
@@ -11,6 +12,7 @@ const {
   movimientoTitularCreateSchema,
   movimientoTitularUpdateSchema,
   movimientosTitularListSchema,
+  resetCajaSchema,
 } = require("./finanzas.validation");
 
 // ── Helpers de formato ────────────────────────────────────────────────────────
@@ -243,6 +245,33 @@ function computarAnalisis({ porDia, porCategoria, resumen }) {
   };
 }
 
+const CAJA_RESET_KEYS = {
+  usado: "caja_reset_usado",
+  fecha: "caja_reset_fecha",
+  at: "caja_reset_at",
+  empleadoId: "caja_reset_empleado_id",
+};
+
+function parseEstadoResetCaja(config = {}) {
+  const usado = config[CAJA_RESET_KEYS.usado] === "1";
+  return {
+    usado,
+    puede_resetear: !usado,
+    fecha: usado ? config[CAJA_RESET_KEYS.fecha] || null : null,
+    reset_at: usado ? config[CAJA_RESET_KEYS.at] || null : null,
+    empleado_id: usado ? Number(config[CAJA_RESET_KEYS.empleadoId] || 0) || null : null,
+  };
+}
+
+async function getOpcionesCaja(cajaIniciaEnCero = true) {
+  const estado = parseEstadoResetCaja(await ConfiguracionService.obtener());
+  return {
+    cajaIniciaEnCero,
+    cajaResetFecha: estado.fecha,
+    cajaResetAt: estado.reset_at,
+  };
+}
+
 // ── Service ───────────────────────────────────────────────────────────────────
 
 const FinanzasService = {
@@ -252,33 +281,32 @@ const FinanzasService = {
   async resumen(query) {
     const parsed = resumenSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getResumen(parsed.data.desde, parsed.data.hasta, {
-      cajaIniciaEnCero: parsed.data.caja_inicia_en_cero,
-    });
+    const opciones = await getOpcionesCaja(parsed.data.caja_inicia_en_cero);
+    return FinanzasRepository.getResumen(parsed.data.desde, parsed.data.hasta, opciones);
   },
 
   async porDia(query) {
     const parsed = porDiaSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getPorDia(parsed.data.desde, parsed.data.hasta);
+    return FinanzasRepository.getPorDia(parsed.data.desde, parsed.data.hasta, await getOpcionesCaja());
   },
 
   async movimientosMes(query) {
     const parsed = movimientosMesSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getMovimientosMes(parsed.data.mes, parsed.data.anio);
+    return FinanzasRepository.getMovimientosMes(parsed.data.mes, parsed.data.anio, await getOpcionesCaja());
   },
 
   async gastosPorCategoria(query) {
     const parsed = rangoSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getGastosPorCategoria(parsed.data.desde, parsed.data.hasta);
+    return FinanzasRepository.getGastosPorCategoria(parsed.data.desde, parsed.data.hasta, await getOpcionesCaja());
   },
 
   async movimientos(query) {
     const parsed = movimientosSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getMovimientos(parsed.data.desde, parsed.data.hasta, parsed.data.page, parsed.data.limit);
+    return FinanzasRepository.getMovimientos(parsed.data.desde, parsed.data.hasta, parsed.data.page, parsed.data.limit, await getOpcionesCaja());
   },
 
   // ── Análisis inteligente ──────────────────────────────────────────────────
@@ -286,14 +314,38 @@ const FinanzasService = {
   async movimientosDetalle(query) {
     const parsed = rangoSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parametros invalidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getMovimientosDetalle(parsed.data.desde, parsed.data.hasta);
+    return FinanzasRepository.getMovimientosDetalle(parsed.data.desde, parsed.data.hasta, await getOpcionesCaja());
   },
 
   async analisis(query) {
     const parsed = rangoSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    const datos = await FinanzasRepository.getAnalisisDatos(parsed.data.desde, parsed.data.hasta);
+    const datos = await FinanzasRepository.getAnalisisDatos(parsed.data.desde, parsed.data.hasta, await getOpcionesCaja());
     return computarAnalisis(datos);
+  },
+
+  async estadoResetCaja() {
+    return parseEstadoResetCaja(await ConfiguracionService.obtener());
+  },
+
+  async resetCaja(body, empleadoId) {
+    const parsed = resetCajaSchema.safeParse(body);
+    if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Datos invalidos.", 400, "VALIDATION_ERROR");
+
+    const estadoActual = await this.estadoResetCaja();
+    if (estadoActual.usado) {
+      throw new AppError("El reset de caja ya fue aplicado. Es una accion de un solo uso.", 409, "CAJA_RESET_ALREADY_USED");
+    }
+
+    const resetAt = new Date().toISOString().slice(0, 19).replace("T", " ");
+    await ConfiguracionRepository.upsertMany([
+      { clave: CAJA_RESET_KEYS.usado, valor: "1", descripcion: "Indica si el reset de caja ya fue aplicado" },
+      { clave: CAJA_RESET_KEYS.fecha, valor: parsed.data.fecha, descripcion: "Fecha desde la que la caja arranca en cero" },
+      { clave: CAJA_RESET_KEYS.at, valor: resetAt, descripcion: "Fecha y hora exacta del reset de caja" },
+      { clave: CAJA_RESET_KEYS.empleadoId, valor: empleadoId ? String(empleadoId) : "", descripcion: "Empleado que aplico el reset de caja" },
+    ]);
+
+    return this.estadoResetCaja();
   },
 
   // ── CRUD Movimientos del Titular ──────────────────────────────────────────
@@ -301,7 +353,7 @@ const FinanzasService = {
   async listarMovimientosTitular(query) {
     const parsed = movimientosTitularListSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    return FinanzasRepository.getMovimientosTitular(parsed.data);
+    return FinanzasRepository.getMovimientosTitular({ ...parsed.data, ...(await getOpcionesCaja()) });
   },
 
   async crearMovimientoTitular(body, empleadoId) {
@@ -345,12 +397,13 @@ const FinanzasService = {
       );
     }
 
+    const opciones = await getOpcionesCaja(cajaIniciaEnCero);
     const [resumen, movimientos, porCategoria, porDia, analisis, config] = await Promise.all([
-      FinanzasRepository.getResumen(desde, hasta, { cajaIniciaEnCero }),
-      FinanzasRepository.getMovimientosTodos(desde, hasta),
-      FinanzasRepository.getGastosPorCategoria(desde, hasta),
-      FinanzasRepository.getPorDia(desde, hasta),
-      FinanzasRepository.getAnalisisDatos(desde, hasta).then(computarAnalisis),
+      FinanzasRepository.getResumen(desde, hasta, opciones),
+      FinanzasRepository.getMovimientosTodos(desde, hasta, opciones),
+      FinanzasRepository.getGastosPorCategoria(desde, hasta, opciones),
+      FinanzasRepository.getPorDia(desde, hasta, opciones),
+      FinanzasRepository.getAnalisisDatos(desde, hasta, opciones).then(computarAnalisis),
       ConfiguracionService.obtener(),
     ]);
 
