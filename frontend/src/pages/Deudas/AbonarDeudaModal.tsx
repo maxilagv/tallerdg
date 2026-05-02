@@ -38,6 +38,10 @@ export function AbonarDeudaModal({ deuda, open, onClose }: Props) {
       add("Abono registrado.");
       queryClient.invalidateQueries({ queryKey: ["deudas"] });
       queryClient.invalidateQueries({ queryKey: ["deudas-resumen"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-resumen"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-por-dia"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
       reset();
       onClose();
     },

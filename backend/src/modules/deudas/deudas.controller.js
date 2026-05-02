@@ -57,7 +57,7 @@ const DeudasController = {
 
   async abonar(req, res, next) {
     try {
-      const data = await DeudasService.abonar(req.params.id, req.body);
+      const data = await DeudasService.abonar(req.params.id, req.body, req.user?.id);
       res.json({ ok: true, data });
     } catch (err) {
       next(err);

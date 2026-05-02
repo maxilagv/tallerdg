@@ -101,7 +101,7 @@ const DeudasService = {
     return DeudasRepository.update(deudaId, parsed.data);
   },
 
-  async abonar(id, data) {
+  async abonar(id, data, usuarioId) {
     const deudaId = parseId(id);
     const parsed = abonarDeudaSchema.safeParse(data);
     if (!parsed.success) {
@@ -121,7 +121,12 @@ const DeudasService = {
       );
     }
 
-    return DeudasRepository.abonar(deudaId, parsed.data.monto);
+    return DeudasRepository.abonar(deudaId, {
+      monto: parsed.data.monto,
+      notas: parsed.data.notas || null,
+      metodo_pago: "efectivo",
+      empleado_id: usuarioId || null,
+    });
   },
 
   async eliminar(id) {

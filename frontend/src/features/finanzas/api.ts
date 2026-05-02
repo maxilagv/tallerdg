@@ -9,6 +9,7 @@ export interface FinanzasResumen {
   // Ingresos operativos
   ingresos:              number;
   cobros_ordenes:        number;
+  abonos_deuda_total:    number;
   ventas_rapidas_total:  number;
   // Egresos operativos
   gastos:                number;
@@ -25,6 +26,7 @@ export interface FinanzasResumen {
   saldo_real:            number;
   // Efectivo físico en caja (solo movimientos en efectivo + titular)
   cobros_efectivo:       number;
+  abonos_deuda_efectivo: number;
   vr_efectivo:           number;
   gastos_efectivo:       number;
   caja_inicia_en_cero:    boolean;
@@ -37,11 +39,13 @@ export interface FinanzasResumen {
   // Estadísticas
   cantidad_ordenes:       number;
   cantidad_cobros:        number;
+  cantidad_abonos_deuda:  number;
   cantidad_compras:       number;
   cantidad_ventas_rapidas: number;
   // Desgloses por método de pago
   desglose_metodos:    Array<{ metodo: MetodoPago; total: number }>;
   desglose_metodos_vr: Array<{ metodo: string;    total: number }>;
+  desglose_metodos_deuda: Array<{ metodo: string; total: number }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,6 +69,7 @@ export interface GastoPorCategoria {
 /**
  * subtipo discrimina el origen exacto del movimiento:
  *  cobro           → cobro de orden de trabajo
+ *  abono_deuda     → abono de deuda manual
  *  venta_rapida    → venta en caja rápida
  *  gasto           → gasto operativo
  *  compra          → compra a proveedor
@@ -73,6 +78,7 @@ export interface GastoPorCategoria {
  */
 export type SubtipoMovimiento =
   | "cobro"
+  | "abono_deuda"
   | "venta_rapida"
   | "gasto"
   | "compra"

@@ -94,25 +94,35 @@ const DeudasRepository = {
     return this.findById(id);
   },
 
-  async abonar(id, montoAbono) {
-    await db("deudas").where({ id }).update({
-      monto_pagado: db.raw("monto_pagado + ?", [montoAbono]),
-      updated_at: db.fn.now(),
+  async abonar(id, { monto, notas = null, metodo_pago = "efectivo", empleado_id = null }) {
+    await db.transaction(async (trx) => {
+      await trx("deuda_abonos").insert({
+        deuda_id: id,
+        monto,
+        metodo_pago,
+        notas,
+        empleado_id,
+      });
+
+      await trx("deudas").where({ id }).update({
+        monto_pagado: trx.raw("monto_pagado + ?", [monto]),
+        updated_at: trx.fn.now(),
+      });
+
+      const deuda = await trx("deudas").where({ id }).first();
+      const saldo = Number(deuda.monto_original) - Number(deuda.monto_pagado);
+      let nuevoEstado;
+      if (saldo <= 0) {
+        nuevoEstado = "pagada";
+      } else if (Number(deuda.monto_pagado) > 0) {
+        nuevoEstado = "parcial";
+      } else {
+        nuevoEstado = "pendiente";
+      }
+
+      await trx("deudas").where({ id }).update({ estado: nuevoEstado, updated_at: trx.fn.now() });
     });
 
-    // Recalcular estado
-    const deuda = await db("deudas").where({ id }).first();
-    const saldo = Number(deuda.monto_original) - Number(deuda.monto_pagado);
-    let nuevoEstado;
-    if (saldo <= 0) {
-      nuevoEstado = "pagada";
-    } else if (Number(deuda.monto_pagado) > 0) {
-      nuevoEstado = "parcial";
-    } else {
-      nuevoEstado = "pendiente";
-    }
-
-    await db("deudas").where({ id }).update({ estado: nuevoEstado, updated_at: db.fn.now() });
     return this.findById(id);
   },
 

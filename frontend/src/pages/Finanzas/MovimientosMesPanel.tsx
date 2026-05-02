@@ -116,6 +116,14 @@ const SUBTIPO_CONFIG: Record<SubtipoMovimiento, SubtipoConfig> = {
     amountCls: "text-green-300",
     sign:      "+",
   },
+  abono_deuda: {
+    label:     "Abonos de deuda",
+    Icon:      TrendingUp,
+    headerCls: "bg-green-500/10",
+    textCls:   "text-green-400",
+    amountCls: "text-green-300",
+    sign:      "+",
+  },
   venta_rapida: {
     label:     "Ventas rápidas",
     Icon:      Zap,

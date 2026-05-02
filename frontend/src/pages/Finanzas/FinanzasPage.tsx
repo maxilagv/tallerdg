@@ -193,6 +193,7 @@ export function FinanzasPage() {
   });
 
   const cobrado      = resumen?.ingresos        ?? 0;
+  const abonosDeuda  = resumen?.abonos_deuda_total ?? 0;
   const gastos       = resumen?.gastos          ?? 0;
   const compras      = resumen?.compras         ?? 0;
   const resultado    = resumen?.resultado_neto  ?? 0;
@@ -200,6 +201,7 @@ export function FinanzasPage() {
   const retiros      = resumen?.retiros_titular ?? 0;
   const saldoCaja    = resumen?.saldo_efectivo  ?? 0;
   const cobrosEfectivo = resumen?.cobros_efectivo ?? 0;
+  const abonosDeudaEfectivo = resumen?.abonos_deuda_efectivo ?? 0;
   const vrEfectivo     = resumen?.vr_efectivo     ?? 0;
   const gastosEfectivo = resumen?.gastos_efectivo ?? 0;
   const saldoInicial   = resumen?.saldo_efectivo_inicial ?? 0;
@@ -319,6 +321,7 @@ export function FinanzasPage() {
             aportes={aportes}
             retiros={retiros}
             cobrosEfectivo={cobrosEfectivo}
+            abonosDeudaEfectivo={abonosDeudaEfectivo}
             vrEfectivo={vrEfectivo}
             gastosEfectivo={gastosEfectivo}
             saldoInicial={saldoInicial}
@@ -356,6 +359,8 @@ export function FinanzasPage() {
                 <p className="text-3xl font-bold text-green-300">{formatMoney(cobrado)}</p>
                 <p className="mt-1 text-xs text-text-muted">
                   {resumen?.cantidad_cobros ?? 0} cobro{(resumen?.cantidad_cobros ?? 0) !== 1 ? "s" : ""} de órdenes
+                  {(resumen?.cantidad_abonos_deuda ?? 0) > 0 &&
+                    ` · Deudas ${formatMoney(abonosDeuda)}`}
                   {(resumen?.cantidad_ventas_rapidas ?? 0) > 0 &&
                     ` · ${resumen!.cantidad_ventas_rapidas} venta${resumen!.cantidad_ventas_rapidas !== 1 ? "s" : ""} rápida${resumen!.cantidad_ventas_rapidas !== 1 ? "s" : ""}`}
                 </p>
@@ -396,6 +401,7 @@ export function FinanzasPage() {
           ─────────────────────────────────────────────────────────────────── */}
           <MetodosPagoCard
             desgloseOrdenes={resumen?.desglose_metodos ?? []}
+            desgloseDeudas={resumen?.desglose_metodos_deuda ?? []}
             desgloseVR={resumen?.desglose_metodos_vr ?? []}
           />
 
@@ -526,6 +532,7 @@ function CajaResetPanel({
 function getMovimientoLabel(mov: MovimientoFinanciero) {
   const labels: Record<string, string> = {
     cobro: "Ingreso por orden",
+    abono_deuda: "Abono de deuda",
     venta_rapida: "Venta rapida",
     gasto: "Gasto",
     compra: "Compra",
@@ -671,6 +678,7 @@ function SaldoCajaCard({
   aportes,
   retiros,
   cobrosEfectivo,
+  abonosDeudaEfectivo,
   vrEfectivo,
   gastosEfectivo,
   saldoInicial,
@@ -682,6 +690,7 @@ function SaldoCajaCard({
   aportes:         number;
   retiros:         number;
   cobrosEfectivo:  number;
+  abonosDeudaEfectivo: number;
   vrEfectivo:      number;
   gastosEfectivo:  number;
   saldoInicial:    number;
@@ -720,6 +729,12 @@ function SaldoCajaCard({
             <div className="rounded-xl bg-surface-2/60 px-3 py-2">
               <p className="text-[10px] text-text-muted">Cobros efectivo</p>
               <p className="text-sm font-bold text-green-300">+{formatMoney(cobrosEfectivo)}</p>
+            </div>
+          )}
+          {abonosDeudaEfectivo > 0 && (
+            <div className="rounded-xl bg-surface-2/60 px-3 py-2">
+              <p className="text-[10px] text-text-muted">Abonos deuda</p>
+              <p className="text-sm font-bold text-green-300">+{formatMoney(abonosDeudaEfectivo)}</p>
             </div>
           )}
           {vrEfectivo > 0 && (
@@ -830,13 +845,18 @@ const METODO_COLOR: Record<string, string> = {
 
 function MetodosPagoCard({
   desgloseOrdenes,
+  desgloseDeudas,
   desgloseVR,
 }: {
   desgloseOrdenes: Array<{ metodo: string; total: number }>;
+  desgloseDeudas:  Array<{ metodo: string; total: number }>;
   desgloseVR:      Array<{ metodo: string; total: number }>;
 }) {
   const mapa: Record<string, number> = {};
   desgloseOrdenes.forEach(({ metodo, total }) => {
+    mapa[metodo] = (mapa[metodo] || 0) + Number(total);
+  });
+  desgloseDeudas.forEach(({ metodo, total }) => {
     mapa[metodo] = (mapa[metodo] || 0) + Number(total);
   });
   desgloseVR.forEach(({ metodo, total }) => {
