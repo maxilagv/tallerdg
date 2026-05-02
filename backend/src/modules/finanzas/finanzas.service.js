@@ -439,6 +439,7 @@ const FinanzasService = {
     const kpis = [
       { label: "INGRESOS TOTALES",             value: resumen.ingresos,        bg: VERDE_BG,   bold: true  },
       { label: "  Cobros de órdenes",           value: resumen.cobros_ordenes,  bg: TEAL_BG,    bold: false },
+      { label: "  Abonos de deuda",             value: resumen.abonos_deuda_total, bg: TEAL_BG, bold: false },
       { label: "  Ventas Rápidas (Caja)",       value: resumen.ventas_rapidas_total, bg: TEAL_BG, bold: false },
       { label: "",                               value: null,                    bg: GRIS_BG,    bold: false },
       { label: "Gastos operativos",             value: resumen.gastos,          bg: ROJO_BG,    bold: false },
@@ -483,6 +484,7 @@ const FinanzasService = {
     [
       ["Órdenes cobradas",       resumen.cantidad_ordenes],
       ["Cobros registrados",     resumen.cantidad_cobros],
+      ["Abonos de deuda",        resumen.cantidad_abonos_deuda],
       ["Ventas rápidas",         resumen.cantidad_ventas_rapidas],
       ["Compras registradas",    resumen.cantidad_compras],
       ["Mov. del titular",       resumen.cantidad_movimientos_titular],
@@ -532,6 +534,7 @@ const FinanzasService = {
 
       const tipoLabel = {
         cobro:           "Cobro",
+        abono_deuda:     "Abono Deuda",
         venta_rapida:    "Venta Rápida",
         gasto:           "Gasto",
         compra:          "Compra",
@@ -540,17 +543,17 @@ const FinanzasService = {
       }[sub] || sub;
 
       const bgMap = {
-        cobro: VERDE_BG, venta_rapida: TEAL_BG,
+        cobro: VERDE_BG, abono_deuda: VERDE_BG, venta_rapida: TEAL_BG,
         gasto: ROJO_BG,  compra: NARANJA_BG,
         aporte_titular: VIOLETA_BG, retiro_titular: VIOLETA_BG,
       };
       const accentMap = {
-        cobro: "FF22c55e", venta_rapida: "FF2dd4bf",
+        cobro: "FF22c55e", abono_deuda: "FF22c55e", venta_rapida: "FF2dd4bf",
         gasto: "FFef4444", compra: "FFf97316",
         aporte_titular: "FFa78bfa", retiro_titular: "FFa78bfa",
       };
       const baseMap = {
-        cobro: "FF86efac", venta_rapida: "FF99f6e4",
+        cobro: "FF86efac", abono_deuda: "FF86efac", venta_rapida: "FF99f6e4",
         gasto: "FFfca5a5", compra: "FFfdba74",
         aporte_titular: "FFddd6fe", retiro_titular: "FFddd6fe",
       };

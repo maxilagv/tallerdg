@@ -263,6 +263,7 @@ function SeccionTipo({
  */
 function GrupoDia({ fecha, movs }: { fecha: string; movs: MovimientoFinanciero[] }) {
   const cobros         = movs.filter((m) => m.subtipo === "cobro");
+  const abonosDeuda    = movs.filter((m) => m.subtipo === "abono_deuda");
   const ventasRapidas  = movs.filter((m) => m.subtipo === "venta_rapida");
   const gastos         = movs.filter((m) => m.subtipo === "gasto");
   const compras        = movs.filter((m) => m.subtipo === "compra");
@@ -293,6 +294,7 @@ function GrupoDia({ fecha, movs }: { fecha: string; movs: MovimientoFinanciero[]
 
       {/* Secciones operativas (sólo se renderizan si hay items) */}
       {cobros.length        > 0 && <SeccionTipo subtipo="cobro"        items={cobros}        />}
+      {abonosDeuda.length   > 0 && <SeccionTipo subtipo="abono_deuda"  items={abonosDeuda}   />}
       {ventasRapidas.length > 0 && <SeccionTipo subtipo="venta_rapida" items={ventasRapidas} />}
       {gastos.length        > 0 && <SeccionTipo subtipo="gasto"        items={gastos}        />}
       {compras.length       > 0 && <SeccionTipo subtipo="compra"       items={compras}       />}

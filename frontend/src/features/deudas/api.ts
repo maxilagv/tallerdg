@@ -42,6 +42,16 @@ export interface ResumenPorCliente {
   total_general: number;
 }
 
+export type MetodoPagoDeuda = "efectivo" | "transferencia" | "tarjeta";
+
+export interface AbonarDeudaPayload {
+  monto: number;
+  metodo_pago: MetodoPagoDeuda;
+  incluye_iva?: boolean;
+  iva_porcentaje?: number;
+  notas?: string | null;
+}
+
 export const deudasApi = {
   listar: (params?: Record<string, unknown>) =>
     api.get<{ ok: boolean; data: DeudasListResponse }>("/deudas", { params }),
@@ -63,8 +73,8 @@ export const deudasApi = {
   actualizar: (id: number, payload: Partial<{ concepto: string; monto_original: number; fecha: string; notas: string | null }>) =>
     api.patch<{ ok: boolean; data: Deuda }>(`/deudas/${id}`, payload),
 
-  abonar: (id: number, monto: number, notas?: string | null) =>
-    api.post<{ ok: boolean; data: Deuda }>(`/deudas/${id}/abonar`, { monto, notas }),
+  abonar: (id: number, payload: AbonarDeudaPayload) =>
+    api.post<{ ok: boolean; data: Deuda }>(`/deudas/${id}/abonar`, payload),
 
   eliminar: (id: number) =>
     api.delete<{ ok: boolean }>(`/deudas/${id}`),

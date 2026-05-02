@@ -447,7 +447,8 @@ const FinanzasRepository = {
 
         SELECT 'ingreso', 'abono_deuda',
                CONCAT('Deuda #', d.id), da.monto, da.created_at,
-               CONCAT('Abono deuda - ', c.apellido, ', ', c.nombre, ' - ', da.metodo_pago)
+               CONCAT('Abono deuda - ', c.apellido, ', ', c.nombre, ' - ', da.metodo_pago,
+                 CASE WHEN da.incluye_iva = 1 THEN CONCAT(' - IVA ', da.iva_porcentaje, '%') ELSE '' END)
         FROM deuda_abonos da
         JOIN deudas d ON da.deuda_id = d.id
         JOIN clientes c ON d.cliente_id = c.id
@@ -558,6 +559,7 @@ const FinanzasRepository = {
                CONCAT('Deuda #', d.id), da.monto, DATE(da.created_at) AS fecha,
                da.created_at AS fecha_hora, da.created_at AS registrado_at,
                CONCAT('Abono deuda - ', c.apellido, ', ', c.nombre,
+                 CASE WHEN da.incluye_iva = 1 THEN CONCAT(' - IVA ', da.iva_porcentaje, '%') ELSE '' END,
                  CASE WHEN da.notas IS NOT NULL AND da.notas != ''
                       THEN CONCAT(' - ', da.notas) ELSE '' END),
                da.metodo_pago
@@ -663,7 +665,8 @@ const FinanzasRepository = {
 
         SELECT 'ingreso', 'abono_deuda', CONCAT('Deuda #', d.id),
                da.monto, da.created_at,
-               CONCAT('Abono deuda - ', c.apellido, ', ', c.nombre),
+               CONCAT('Abono deuda - ', c.apellido, ', ', c.nombre,
+                 CASE WHEN da.incluye_iva = 1 THEN CONCAT(' - IVA ', da.iva_porcentaje, '%') ELSE '' END),
                da.metodo_pago
         FROM deuda_abonos da
         JOIN deudas d ON da.deuda_id = d.id

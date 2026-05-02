@@ -94,17 +94,31 @@ const DeudasRepository = {
     return this.findById(id);
   },
 
-  async abonar(id, { monto, notas = null, metodo_pago = "efectivo", empleado_id = null }) {
+  async abonar(id, {
+    monto,
+    monto_base,
+    incluye_iva = false,
+    iva_porcentaje = 0,
+    iva_monto = 0,
+    notas = null,
+    metodo_pago = "efectivo",
+    empleado_id = null,
+  }) {
     await db.transaction(async (trx) => {
       await trx("deuda_abonos").insert({
         deuda_id: id,
         monto,
+        monto_base: monto_base ?? monto,
+        incluye_iva: incluye_iva ? 1 : 0,
+        iva_porcentaje,
+        iva_monto,
         metodo_pago,
         notas,
         empleado_id,
       });
 
       await trx("deudas").where({ id }).update({
+        monto_original: trx.raw("monto_original + ?", [iva_monto]),
         monto_pagado: trx.raw("monto_pagado + ?", [monto]),
         updated_at: trx.fn.now(),
       });

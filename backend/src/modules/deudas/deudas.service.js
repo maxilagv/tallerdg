@@ -20,6 +20,10 @@ function parseId(value) {
   return parsed.data;
 }
 
+function roundMoney(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
 const DeudasService = {
   async listar(query) {
     const parsed = listDeudasSchema.safeParse(query);
@@ -112,19 +116,29 @@ const DeudasService = {
     if (!deuda) throw new AppError("Deuda no encontrada.", 404, "NOT_FOUND");
     if (deuda.estado === "pagada") throw new AppError("Esta deuda ya está pagada.", 400, "DEUDA_PAGADA");
 
+    const montoBase = roundMoney(parsed.data.monto);
+    const incluyeIva = Boolean(parsed.data.incluye_iva);
+    const ivaPorcentaje = incluyeIva ? roundMoney(parsed.data.iva_porcentaje ?? 21) : 0;
+    const ivaMonto = incluyeIva ? roundMoney(montoBase * (ivaPorcentaje / 100)) : 0;
+    const montoTotal = roundMoney(montoBase + ivaMonto);
+
     const saldoActual = Number(deuda.monto_original) - Number(deuda.monto_pagado);
-    if (parsed.data.monto > saldoActual) {
+    if (montoBase > saldoActual) {
       throw new AppError(
-        `El abono ($${parsed.data.monto}) supera el saldo pendiente ($${saldoActual.toFixed(2)}).`,
+        `El abono ($${montoBase}) supera el saldo pendiente ($${saldoActual.toFixed(2)}).`,
         400,
         "ABONO_EXCEDE_SALDO"
       );
     }
 
     return DeudasRepository.abonar(deudaId, {
-      monto: parsed.data.monto,
+      monto: montoTotal,
+      monto_base: montoBase,
+      incluye_iva: incluyeIva,
+      iva_porcentaje: ivaPorcentaje,
+      iva_monto: ivaMonto,
       notas: parsed.data.notas || null,
-      metodo_pago: "efectivo",
+      metodo_pago: parsed.data.metodo_pago,
       empleado_id: usuarioId || null,
     });
   },

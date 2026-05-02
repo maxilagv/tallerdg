@@ -23,8 +23,13 @@ const updateDeudaSchema = z.object({
   notas: z.string().trim().nullable().optional(),
 });
 
+const metodoPagoDeudaSchema = z.enum(["efectivo", "transferencia", "tarjeta"]);
+
 const abonarDeudaSchema = z.object({
   monto: z.coerce.number().positive("El monto del abono debe ser mayor a 0"),
+  metodo_pago: metodoPagoDeudaSchema.default("efectivo"),
+  incluye_iva: z.coerce.boolean().default(false),
+  iva_porcentaje: z.coerce.number().min(0, "El IVA no puede ser negativo").max(100, "El IVA no puede superar el 100%").default(21),
   notas: z.string().trim().nullable().optional(),
 });
 
