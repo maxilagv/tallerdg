@@ -1,4 +1,5 @@
 import api from "../../shared/lib/axios";
+import type { MetodoPago } from "../pagos/api";
 
 // ── Tipos base ───────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ export interface MovimientoCuenta {
   tipo: TipoMovimiento;
   monto: number;
   descripcion: string;
+  metodo_pago?: MetodoPago | null;
   compra_id?: number | null;
   compra_fecha?: string | null;
   compra_total?: number | null;
@@ -115,7 +117,7 @@ export const proveedoresApi = {
 
   registrarPago: (
     id: number,
-    payload: { monto: number; descripcion: string; fecha?: string }
+    payload: { monto: number; descripcion: string; fecha?: string; metodo_pago?: MetodoPago }
   ) =>
     api.post<{ ok: boolean; data: CuentaCorriente }>(
       `/proveedores/${id}/cuenta-corriente/pago`,

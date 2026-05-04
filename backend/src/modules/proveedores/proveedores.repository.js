@@ -111,7 +111,7 @@ const ProveedoresRepository = {
   },
 
   // conn puede ser una transacción (trx) o el db normal
-  async insertMovimiento(conn, { proveedor_id, tipo, monto, descripcion, compra_id, empleado_id, created_at }) {
+  async insertMovimiento(conn, { proveedor_id, tipo, monto, descripcion, compra_id, empleado_id, metodo_pago, created_at }) {
     const payload = {
       proveedor_id,
       tipo,
@@ -120,6 +120,10 @@ const ProveedoresRepository = {
       compra_id: compra_id || null,
       empleado_id: empleado_id || null,
     };
+
+    if (metodo_pago) {
+      payload.metodo_pago = metodo_pago;
+    }
 
     if (created_at) {
       payload.created_at = created_at;
@@ -157,6 +161,7 @@ const ProveedoresRepository = {
           "m.tipo",
           "m.monto",
           "m.descripcion",
+          "m.metodo_pago",
           "m.compra_id",
           "m.created_at",
           db.raw(

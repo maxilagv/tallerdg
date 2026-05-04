@@ -148,6 +148,14 @@ const SUBTIPO_CONFIG: Record<SubtipoMovimiento, SubtipoConfig> = {
     amountCls: "text-orange-300",
     sign:      "-",
   },
+  pago_proveedor: {
+    label:     "Pagos a proveedores",
+    Icon:      ShoppingCart,
+    headerCls: "bg-orange-500/10",
+    textCls:   "text-orange-400",
+    amountCls: "text-orange-300",
+    sign:      "-",
+  },
   aporte_titular: {
     label:     "Aportes del titular",
     Icon:      ArrowDownToLine,
@@ -267,12 +275,13 @@ function GrupoDia({ fecha, movs }: { fecha: string; movs: MovimientoFinanciero[]
   const ventasRapidas  = movs.filter((m) => m.subtipo === "venta_rapida");
   const gastos         = movs.filter((m) => m.subtipo === "gasto");
   const compras        = movs.filter((m) => m.subtipo === "compra");
+  const pagosProveedor = movs.filter((m) => m.subtipo === "pago_proveedor");
   const aportesTitular = movs.filter((m) => m.subtipo === "aporte_titular");
   const retirosTitular = movs.filter((m) => m.subtipo === "retiro_titular");
 
   // Neto operativo del día (ingresos − gastos − compras, sin titular)
   const totalIngresos  = sumarIngresos(movs);
-  const totalEgresos   = [...gastos, ...compras].reduce((s, m) => s + Number(m.monto), 0);
+  const totalEgresos   = [...gastos, ...compras, ...pagosProveedor].reduce((s, m) => s + Number(m.monto), 0);
   const neto           = totalIngresos - totalEgresos;
 
   // ¿Hay movimientos del titular en este día?
@@ -298,6 +307,7 @@ function GrupoDia({ fecha, movs }: { fecha: string; movs: MovimientoFinanciero[]
       {ventasRapidas.length > 0 && <SeccionTipo subtipo="venta_rapida" items={ventasRapidas} />}
       {gastos.length        > 0 && <SeccionTipo subtipo="gasto"        items={gastos}        />}
       {compras.length       > 0 && <SeccionTipo subtipo="compra"       items={compras}       />}
+      {pagosProveedor.length > 0 && <SeccionTipo subtipo="pago_proveedor" items={pagosProveedor} />}
 
       {/* Separador + secciones del titular (no operativas) */}
       {hayTitular && (
@@ -346,7 +356,7 @@ export function MovimientosMesPanel() {
   // Totales del mes para el resumen superior
   const totalIngresos = sumarIngresos(movimientos);
   const totalGastos   = sumar(movimientos, "gasto");
-  const totalCompras  = sumar(movimientos, "compra");
+  const totalCompras  = sumar(movimientos, "compra") + sumar(movimientos, "pago_proveedor");
 
   const aniosDisponibles = Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i);
 

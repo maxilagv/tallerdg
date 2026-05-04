@@ -14,6 +14,9 @@ export interface FinanzasResumen {
   // Egresos operativos
   gastos:                number;
   compras:               number;
+  compras_directas:      number;
+  compras_a_cuenta:      number;
+  pagos_proveedores:     number;
   egresos:               number;
   // Resultado operativo (sin movimientos del titular)
   resultado_neto:        number;
@@ -29,6 +32,7 @@ export interface FinanzasResumen {
   abonos_deuda_efectivo: number;
   vr_efectivo:           number;
   gastos_efectivo:       number;
+  pagos_proveedores_efectivo: number;
   caja_inicia_en_cero:    boolean;
   caja_reset_activo:      boolean;
   caja_reset_fecha:       string | null;
@@ -41,7 +45,10 @@ export interface FinanzasResumen {
   cantidad_cobros:        number;
   cantidad_abonos_deuda:  number;
   cantidad_compras:       number;
+  cantidad_compras_a_cuenta: number;
+  cantidad_pagos_proveedores: number;
   cantidad_ventas_rapidas: number;
+  deuda_proveedores_total: number;
   // Desgloses por método de pago
   desglose_metodos:    Array<{ metodo: MetodoPago; total: number }>;
   desglose_metodos_vr: Array<{ metodo: string;    total: number }>;
@@ -72,7 +79,8 @@ export interface GastoPorCategoria {
  *  abono_deuda     → abono de deuda manual
  *  venta_rapida    → venta en caja rápida
  *  gasto           → gasto operativo
- *  compra          → compra a proveedor
+ *  compra          → compra/pago a proveedor que impacta caja
+ *  pago_proveedor  → pago de deuda de proveedor
  *  aporte_titular  → aporte del dueño (no operativo)
  *  retiro_titular  → retiro del dueño (no operativo)
  */
@@ -82,6 +90,7 @@ export type SubtipoMovimiento =
   | "venta_rapida"
   | "gasto"
   | "compra"
+  | "pago_proveedor"
   | "aporte_titular"
   | "retiro_titular";
 

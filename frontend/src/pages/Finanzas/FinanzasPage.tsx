@@ -196,6 +196,8 @@ export function FinanzasPage() {
   const abonosDeuda  = resumen?.abonos_deuda_total ?? 0;
   const gastos       = resumen?.gastos          ?? 0;
   const compras      = resumen?.compras         ?? 0;
+  const comprasACuenta = resumen?.compras_a_cuenta ?? 0;
+  const deudaProveedores = resumen?.deuda_proveedores_total ?? 0;
   const resultado    = resumen?.resultado_neto  ?? 0;
   const aportes      = resumen?.aportes_titular ?? 0;
   const retiros      = resumen?.retiros_titular ?? 0;
@@ -329,6 +331,23 @@ export function FinanzasPage() {
             cajaResetActivo={Boolean(resumen?.caja_reset_activo)}
           />
 
+          {deudaProveedores > 0 && (
+            <Card>
+              <div className="flex items-start gap-3">
+                <AlertCircle size={18} className="mt-0.5 shrink-0 text-orange-300" />
+                <div>
+                  <p className="text-sm font-semibold text-text">
+                    Deuda actual a proveedores: {formatMoney(deudaProveedores)}
+                  </p>
+                  <p className="mt-1 text-xs text-text-muted">
+                    Las compras a cuenta no se descuentan de caja hasta registrar el pago.
+                    {comprasACuenta > 0 && ` En este periodo cargaste ${formatMoney(comprasACuenta)} a cuenta.`}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {esVistaDiaria && (
             <MovimientosDiariosPanel
               fecha={desde}
@@ -375,7 +394,7 @@ export function FinanzasPage() {
                 <p className="text-3xl font-bold text-red-300">{formatMoney(gastos + compras)}</p>
                 <p className="mt-1 text-xs text-text-muted">
                   Gastos {formatMoney(gastos)}
-                  {compras > 0 && <span> · Compras {formatMoney(compras)}</span>}
+                  {compras > 0 && <span> · Compras/pagos {formatMoney(compras)}</span>}
                 </p>
               </Card>
 
@@ -536,6 +555,7 @@ function getMovimientoLabel(mov: MovimientoFinanciero) {
     venta_rapida: "Venta rapida",
     gasto: "Gasto",
     compra: "Compra",
+    pago_proveedor: "Pago proveedor",
     aporte_titular: "Ingreso manual",
     retiro_titular: "Retiro de caja",
   };

@@ -22,6 +22,7 @@ export interface Adelanto {
   periodo_id: number;
   empleado_id: number;
   monto: number;
+  fecha: string;
   descripcion?: string | null;
   gasto_id?: number | null;
   created_at: string;
@@ -92,7 +93,7 @@ export const sueldosApi = {
 
   registrarAdelanto: (
     periodoId: number,
-    payload: { monto: number; descripcion?: string; metodo_pago: MetodoPago }
+    payload: { monto: number; fecha?: string; descripcion?: string; metodo_pago: MetodoPago }
   ) =>
     api.post<{ ok: boolean; data: AdelantoResult }>(
       `/sueldos/periodos/${periodoId}/adelantos`,

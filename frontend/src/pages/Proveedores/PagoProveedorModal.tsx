@@ -13,10 +13,12 @@ import { Modal } from "../../shared/ui/Modal";
 import { useToast } from "../../shared/ui/Toast";
 import { formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
+import { metodoPagoOptions } from "../../features/pagos/api";
 
 const schema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a cero"),
   fecha: z.string().min(1, "La fecha es obligatoria"),
+  metodo_pago: z.enum(["efectivo", "transferencia", "tarjeta_debito", "tarjeta_credito", "cheque"]),
   descripcion: z.string().min(1, "La descripción es obligatoria"),
 });
 
@@ -46,7 +48,12 @@ export function PagoProveedorModal({
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema) as any,
-    defaultValues: { monto: undefined, fecha: toLocalDateInputValue(), descripcion: "" },
+    defaultValues: {
+      monto: undefined,
+      fecha: toLocalDateInputValue(),
+      metodo_pago: "efectivo",
+      descripcion: "",
+    },
   });
 
   const mutation = useMutation({
@@ -100,6 +107,23 @@ export function PagoProveedorModal({
           error={errors.fecha?.message}
           {...register("fecha")}
         />
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text-muted">Metodo de pago *</label>
+          <select
+            className="rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+            {...register("metodo_pago")}
+          >
+            {metodoPagoOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          {errors.metodo_pago && (
+            <p className="text-xs text-red-400">{errors.metodo_pago.message}</p>
+          )}
+        </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-text-muted">

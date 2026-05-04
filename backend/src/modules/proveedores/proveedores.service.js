@@ -219,6 +219,7 @@ const ProveedoresService = {
         descripcion: parsed.data.descripcion,
         compra_id: null,
         empleado_id: empleadoId,
+        metodo_pago: parsed.data.metodo_pago,
         created_at: normalizarFechaMovimiento(parsed.data.fecha),
       });
 

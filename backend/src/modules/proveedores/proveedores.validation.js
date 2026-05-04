@@ -34,9 +34,18 @@ const activarCCSchema = z.object({
   saldo_inicial: z.coerce.number().default(0),
 });
 
+const metodoPagoProveedorSchema = z.enum([
+  "efectivo",
+  "transferencia",
+  "tarjeta_debito",
+  "tarjeta_credito",
+  "cheque",
+]);
+
 const pagoProveedorSchema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a cero"),
   fecha: z.string().trim().min(1).optional(),
+  metodo_pago: metodoPagoProveedorSchema.default("efectivo"),
   descripcion: z
     .string()
     .trim()

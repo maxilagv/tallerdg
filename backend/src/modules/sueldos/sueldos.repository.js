@@ -105,7 +105,10 @@ const SueldosRepository = {
   },
 
   async getAdelantosDePeriodo(periodoId) {
-    return db("adelantos_sueldo").where({ periodo_id: periodoId }).orderBy("created_at", "asc");
+    return db("adelantos_sueldo")
+      .where({ periodo_id: periodoId })
+      .orderBy("fecha", "asc")
+      .orderBy("created_at", "asc");
   },
 
   async liquidarPeriodo(periodoId, pagadoPorEmpleadoId, metodoPago = "efectivo") {
@@ -153,12 +156,13 @@ const SueldosRepository = {
     });
   },
 
-  async registrarAdelanto(periodoId, { monto, descripcion, metodo_pago }, registradoPorId) {
+  async registrarAdelanto(periodoId, { monto, fecha, descripcion, metodo_pago }, registradoPorId) {
     const periodo = await db("periodos_sueldo").where({ id: periodoId }).first();
     if (!periodo) throw new Error("Periodo no encontrado.");
     if (periodo.estado === "pagado") throw new Error("El periodo ya fue liquidado.");
 
     const empleado = await db("empleados").where({ id: periodo.empleado_id }).first();
+    const fechaAdelanto = fecha || new Date().toISOString().slice(0, 10);
 
     return db.transaction(async (trx) => {
       const categoriaId = await getCategoriaSueldos(trx);
@@ -170,7 +174,7 @@ const SueldosRepository = {
           `Adelanto de sueldo - ${empleado.nombre} ${empleado.apellido}`,
         monto,
         metodo_pago,
-        fecha: new Date().toISOString().slice(0, 10),
+        fecha: fechaAdelanto,
         empleado_id: registradoPorId || null,
         referencia_empleado_id: periodo.empleado_id,
         activo: 1,
@@ -180,6 +184,7 @@ const SueldosRepository = {
         periodo_id: periodoId,
         empleado_id: periodo.empleado_id,
         monto,
+        fecha: fechaAdelanto,
         descripcion: descripcion?.trim() || null,
         gasto_id: gastoId,
         registrado_por_empleado_id: registradoPorId || null,
@@ -215,6 +220,7 @@ const SueldosRepository = {
           adelantos = Number(suma) || 0;
           adelantosDetalle = await db("adelantos_sueldo")
             .where({ periodo_id: periodoAbierto.id })
+            .orderBy("fecha", "desc")
             .orderBy("created_at", "desc");
         }
 

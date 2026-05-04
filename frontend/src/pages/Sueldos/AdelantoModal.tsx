@@ -12,7 +12,7 @@ import { Input } from "../../shared/ui/Input";
 import { Modal } from "../../shared/ui/Modal";
 import { useToast } from "../../shared/ui/Toast";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
-import { formatMoney } from "../../shared/utils/format";
+import { formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 
 interface Props {
   open: boolean;
@@ -33,6 +33,7 @@ export function AdelantoModal({
 }: Props) {
   const { add } = useToast();
   const [monto, setMonto] = useState("");
+  const [fecha, setFecha] = useState(toLocalDateInputValue());
   const [descripcion, setDescripcion] = useState("");
   const [metodoPago, setMetodoPago] = useState<MetodoPago>(metodoPagoOptions[0].value);
   const [confirmarSupera, setConfirmarSupera] = useState(false);
@@ -44,6 +45,7 @@ export function AdelantoModal({
     mutationFn: () =>
       sueldosApi.registrarAdelanto(periodoId, {
         monto: montoNum,
+        fecha,
         descripcion: descripcion || undefined,
         metodo_pago: metodoPago,
       }),
@@ -62,6 +64,7 @@ export function AdelantoModal({
 
   const handleClose = () => {
     setMonto("");
+    setFecha(toLocalDateInputValue());
     setDescripcion("");
     setMetodoPago(metodoPagoOptions[0].value);
     setConfirmarSupera(false);
@@ -95,6 +98,13 @@ export function AdelantoModal({
             setConfirmarSupera(false);
           }}
           placeholder="Ej: 50000"
+        />
+
+        <Input
+          label="Fecha del adelanto"
+          type="date"
+          value={fecha}
+          onChange={(e) => setFecha(e.target.value)}
         />
 
         <div className="flex flex-col gap-1.5">
@@ -147,7 +157,7 @@ export function AdelantoModal({
           <Button
             onClick={handleConfirm}
             loading={mutation.isPending}
-            disabled={!monto || montoNum <= 0}
+            disabled={!monto || montoNum <= 0 || !fecha}
             variant={confirmarSupera ? "danger" : "primary"}
           >
             {confirmarSupera ? "Si, registrar igual" : "Registrar adelanto"}

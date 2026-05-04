@@ -226,6 +226,13 @@ function computarAnalisis({ porDia, porCategoria, resumen }) {
     }
   }
 
+  if (Number(resumen.deuda_proveedores_total || 0) > 0) {
+    alertas.push({
+      nivel: "info",
+      mensaje: `Deuda actual a proveedores: ${fmtMoney(resumen.deuda_proveedores_total)}. Las compras a cuenta no descuentan caja hasta registrar el pago.`,
+    });
+  }
+
   return {
     dias_con_actividad:    n,
     dias_positivos:        diasPositivos.length,
@@ -443,7 +450,11 @@ const FinanzasService = {
       { label: "  Ventas Rápidas (Caja)",       value: resumen.ventas_rapidas_total, bg: TEAL_BG, bold: false },
       { label: "",                               value: null,                    bg: GRIS_BG,    bold: false },
       { label: "Gastos operativos",             value: resumen.gastos,          bg: ROJO_BG,    bold: false },
-      { label: "Compras a proveedores",         value: resumen.compras,         bg: NARANJA_BG, bold: false },
+      { label: "Compras / pagos a proveedores", value: resumen.compras,         bg: NARANJA_BG, bold: false },
+      { label: "  Compras directas",            value: resumen.compras_directas || 0, bg: NARANJA_BG, bold: false },
+      { label: "  Pagos a proveedores",         value: resumen.pagos_proveedores || 0, bg: NARANJA_BG, bold: false },
+      { label: "Compras a cuenta (no caja)",     value: resumen.compras_a_cuenta || 0, bg: GRIS_BG, bold: false },
+      { label: "Deuda actual proveedores",       value: resumen.deuda_proveedores_total || 0, bg: GRIS_BG, bold: false },
       { label: "TOTAL EGRESOS",                 value: resumen.egresos,         bg: ROJO_BG,    bold: true  },
       { label: "",                               value: null,                    bg: GRIS_BG,    bold: false },
       { label: "RESULTADO OPERATIVO",           value: resumen.resultado_neto,  bg: resumen.resultado_neto >= 0 ? AZUL_BG : ROJO_BG, bold: true },
@@ -486,7 +497,9 @@ const FinanzasService = {
       ["Cobros registrados",     resumen.cantidad_cobros],
       ["Abonos de deuda",        resumen.cantidad_abonos_deuda],
       ["Ventas rápidas",         resumen.cantidad_ventas_rapidas],
-      ["Compras registradas",    resumen.cantidad_compras],
+      ["Compras/pagos en caja",  resumen.cantidad_compras],
+      ["Compras a cuenta",       resumen.cantidad_compras_a_cuenta || 0],
+      ["Pagos a proveedores",    resumen.cantidad_pagos_proveedores || 0],
       ["Mov. del titular",       resumen.cantidad_movimientos_titular],
       ["Días con actividad",     analisis.dias_con_actividad],
       ["Días positivos",         analisis.dias_positivos],
@@ -538,23 +551,24 @@ const FinanzasService = {
         venta_rapida:    "Venta Rápida",
         gasto:           "Gasto",
         compra:          "Compra",
+        pago_proveedor:  "Pago Proveedor",
         aporte_titular:  "Aporte Titular",
         retiro_titular:  "Retiro Titular",
       }[sub] || sub;
 
       const bgMap = {
         cobro: VERDE_BG, abono_deuda: VERDE_BG, venta_rapida: TEAL_BG,
-        gasto: ROJO_BG,  compra: NARANJA_BG,
+        gasto: ROJO_BG,  compra: NARANJA_BG, pago_proveedor: NARANJA_BG,
         aporte_titular: VIOLETA_BG, retiro_titular: VIOLETA_BG,
       };
       const accentMap = {
         cobro: "FF22c55e", abono_deuda: "FF22c55e", venta_rapida: "FF2dd4bf",
-        gasto: "FFef4444", compra: "FFf97316",
+        gasto: "FFef4444", compra: "FFf97316", pago_proveedor: "FFf97316",
         aporte_titular: "FFa78bfa", retiro_titular: "FFa78bfa",
       };
       const baseMap = {
         cobro: "FF86efac", abono_deuda: "FF86efac", venta_rapida: "FF99f6e4",
-        gasto: "FFfca5a5", compra: "FFfdba74",
+        gasto: "FFfca5a5", compra: "FFfdba74", pago_proveedor: "FFfdba74",
         aporte_titular: "FFddd6fe", retiro_titular: "FFddd6fe",
       };
 

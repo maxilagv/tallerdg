@@ -37,6 +37,32 @@ function buildCorteFechaYCreated(fechaColumn, createdColumn, options = {}) {
   };
 }
 
+function aplicarSoloComprasCaja(query, alias = "c") {
+  query.whereNotExists(function notCuentaCorriente() {
+    this.select(db.raw("1"))
+      .from("movimientos_cuenta_proveedor as mcc")
+      .whereRaw(`mcc.compra_id = ${alias}.id`)
+      .where("mcc.tipo", "deuda");
+  });
+}
+
+function aplicarSoloComprasCuenta(query, alias = "c") {
+  query.whereExists(function cuentaCorriente() {
+    this.select(db.raw("1"))
+      .from("movimientos_cuenta_proveedor as mcc")
+      .whereRaw(`mcc.compra_id = ${alias}.id`)
+      .where("mcc.tipo", "deuda");
+  });
+}
+
+function buildSoloComprasCaja(alias = "c") {
+  return ` AND NOT EXISTS (
+    SELECT 1
+    FROM movimientos_cuenta_proveedor mcc
+    WHERE mcc.compra_id = ${alias}.id AND mcc.tipo = 'deuda'
+  )`;
+}
+
 /**
  * FinanzasRepository
  * ------------------
@@ -74,7 +100,12 @@ const FinanzasRepository = {
       gastosEfectivo,
       cobrosEfectivoArrastre,
       gastosEfectivoArrastre,
-      compras,
+      comprasCaja,
+      comprasACuenta,
+      pagosProveedores,
+      pagosProveedoresEfectivo,
+      pagosProveedoresEfectivoArrastre,
+      deudaProveedores,
       ventasRapidas,
       ventasRapidasPorMetodo,
       ventasRapidasEfectivo,
@@ -178,13 +209,55 @@ const FinanzasRepository = {
         .first(),
 
       // Compras a proveedores
-      db("compras")
-        .whereBetween("fecha", [desde, hasta])
-        .modify((q) => aplicarCorteFechaYCreated(q, "fecha", "created_at", options))
+      db("compras as c")
+        .whereBetween("c.fecha", [desde, hasta])
+        .modify((q) => aplicarCorteFechaYCreated(q, "c.fecha", "c.created_at", options))
+        .modify((q) => aplicarSoloComprasCaja(q, "c"))
         .select(
-          db.raw("COALESCE(SUM(total), 0) as total"),
+          db.raw("COALESCE(SUM(c.total), 0) as total"),
           db.raw("COUNT(*) as cantidad")
         )
+        .first(),
+
+      db("compras as c")
+        .whereBetween("c.fecha", [desde, hasta])
+        .modify((q) => aplicarCorteFechaYCreated(q, "c.fecha", "c.created_at", options))
+        .modify((q) => aplicarSoloComprasCuenta(q, "c"))
+        .select(
+          db.raw("COALESCE(SUM(c.total), 0) as total"),
+          db.raw("COUNT(*) as cantidad")
+        )
+        .first(),
+
+      db("movimientos_cuenta_proveedor as m")
+        .where("m.tipo", "pago")
+        .whereBetween("m.created_at", [`${desde} 00:00:00`, `${hasta} 23:59:59`])
+        .modify((q) => aplicarCorteCreated(q, "m.created_at", options))
+        .select(
+          db.raw("COALESCE(SUM(m.monto), 0) as total"),
+          db.raw("COUNT(*) as cantidad")
+        )
+        .first(),
+
+      db("movimientos_cuenta_proveedor as m")
+        .where("m.tipo", "pago")
+        .whereRaw("COALESCE(m.metodo_pago, 'efectivo') = ?", ["efectivo"])
+        .whereBetween("m.created_at", [`${desde} 00:00:00`, `${hasta} 23:59:59`])
+        .modify((q) => aplicarCorteCreated(q, "m.created_at", options))
+        .select(db.raw("COALESCE(SUM(m.monto), 0) as total"))
+        .first(),
+
+      db("movimientos_cuenta_proveedor as m")
+        .where("m.tipo", "pago")
+        .whereRaw("COALESCE(m.metodo_pago, 'efectivo') = ?", ["efectivo"])
+        .where("m.created_at", "<", `${desde} 00:00:00`)
+        .modify((q) => aplicarCorteCreated(q, "m.created_at", options))
+        .select(db.raw("COALESCE(SUM(m.monto), 0) as total"))
+        .first(),
+
+      db("cuentas_corrientes_proveedores")
+        .where("activa", 1)
+        .select(db.raw("COALESCE(SUM(CASE WHEN saldo > 0 THEN saldo ELSE 0 END), 0) as total"))
         .first(),
 
       // Ventas rápidas (caja rápida — ingresos sin orden de trabajo)
@@ -255,7 +328,13 @@ const FinanzasRepository = {
     const totalAbonosDeudaEfectivoArrastre = Number(deudaAbonosEfectivoArrastre?.total) || 0;
     const totalGastosEfectivoArrastre = Number(gastosEfectivoArrastre?.total) || 0;
     const totalVREfectivoArrastre = Number(ventasRapidasEfectivoArrastre?.total) || 0;
-    const totalCompras         = Number(compras?.total)             || 0;
+    const totalComprasCaja     = Number(comprasCaja?.total)         || 0;
+    const totalComprasACuenta  = Number(comprasACuenta?.total)      || 0;
+    const totalPagosProveedores = Number(pagosProveedores?.total)   || 0;
+    const totalPagosProveedoresEfectivo = Number(pagosProveedoresEfectivo?.total) || 0;
+    const totalPagosProveedoresEfectivoArrastre = Number(pagosProveedoresEfectivoArrastre?.total) || 0;
+    const deudaProveedoresTotal = Number(deudaProveedores?.total)   || 0;
+    const totalCompras         = totalComprasCaja + totalPagosProveedores;
     const totalAportes         = Number(titular?.aportes)           || 0;
     const totalRetiros         = Number(titular?.retiros)           || 0;
     const totalAportesArrastre = Number(titularArrastre?.aportes)   || 0;
@@ -271,7 +350,8 @@ const FinanzasRepository = {
       totalVREfectivoArrastre -
       totalGastosEfectivoArrastre +
       totalAportesArrastre -
-      totalRetirosArrastre;
+      totalRetirosArrastre -
+      totalPagosProveedoresEfectivoArrastre;
 
     const saldoEfectivoInicial = cajaIniciaEnCero ? 0 : saldoEfectivoArrastre;
 
@@ -283,7 +363,8 @@ const FinanzasRepository = {
       totalVREfectivo -
       totalGastosEfectivo +
       totalAportes -
-      totalRetiros;
+      totalRetiros -
+      totalPagosProveedoresEfectivo;
 
     return {
       // ── Ingresos operativos ───────────────────────────────────────────────
@@ -294,6 +375,9 @@ const FinanzasRepository = {
       // ── Egresos operativos ────────────────────────────────────────────────
       gastos:                totalGastos,
       compras:               totalCompras,
+      compras_directas:      totalComprasCaja,
+      compras_a_cuenta:      totalComprasACuenta,
+      pagos_proveedores:     totalPagosProveedores,
       egresos:               totalEgresos,
       // ── Resultado operativo ───────────────────────────────────────────────
       resultado_neto:        resultadoOperativo,
@@ -307,6 +391,7 @@ const FinanzasRepository = {
       abonos_deuda_efectivo: totalAbonosDeudaEfectivo,
       vr_efectivo:           totalVREfectivo,
       gastos_efectivo:       totalGastosEfectivo,
+      pagos_proveedores_efectivo: totalPagosProveedoresEfectivo,
       caja_inicia_en_cero:    cajaIniciaEnCero,
       caja_reset_activo:      Boolean(options.cajaResetAt),
       caja_reset_fecha:       options.cajaResetFecha || null,
@@ -320,8 +405,11 @@ const FinanzasRepository = {
       cantidad_ordenes:       Number(cobros?.cantidad_ordenes)       || 0,
       cantidad_cobros:        Number(cobros?.cantidad_cobros)        || 0,
       cantidad_abonos_deuda:  Number(deudaAbonos?.cantidad)          || 0,
-      cantidad_compras:       Number(compras?.cantidad)              || 0,
+      cantidad_compras:       (Number(comprasCaja?.cantidad) || 0) + (Number(pagosProveedores?.cantidad) || 0),
+      cantidad_compras_a_cuenta: Number(comprasACuenta?.cantidad)    || 0,
+      cantidad_pagos_proveedores: Number(pagosProveedores?.cantidad) || 0,
       cantidad_ventas_rapidas: Number(ventasRapidas?.cantidad)       || 0,
+      deuda_proveedores_total: deudaProveedoresTotal,
       // ── Desgloses ─────────────────────────────────────────────────────────
       desglose_metodos: cobrosPorMetodo.map((item) => ({
         metodo: item.metodo,
@@ -340,7 +428,7 @@ const FinanzasRepository = {
 
   // ── Desglose por día (para gráficos) ─────────────────────────────────────
   async getPorDia(desde, hasta, options = {}) {
-    const [ingresosCobros, ingresosAbonosDeuda, ingresosVR, gastos, compras] = await Promise.all([
+    const [ingresosCobros, ingresosAbonosDeuda, ingresosVR, gastos, comprasCaja, pagosProveedores] = await Promise.all([
       db("pagos as p")
         .whereNull("p.anulado_at")
         .whereBetween("p.created_at", [`${desde} 00:00:00`, `${hasta} 23:59:59`])
@@ -371,11 +459,20 @@ const FinanzasRepository = {
         .groupBy("fecha")
         .orderBy("dia", "asc"),
 
-      db("compras")
-        .whereBetween("fecha", [desde, hasta])
-        .modify((q) => aplicarCorteFechaYCreated(q, "fecha", "created_at", options))
-        .select(db.raw("fecha as dia"), db.raw("COALESCE(SUM(total), 0) as total"))
-        .groupBy("fecha")
+      db("compras as c")
+        .whereBetween("c.fecha", [desde, hasta])
+        .modify((q) => aplicarCorteFechaYCreated(q, "c.fecha", "c.created_at", options))
+        .modify((q) => aplicarSoloComprasCaja(q, "c"))
+        .select(db.raw("c.fecha as dia"), db.raw("COALESCE(SUM(c.total), 0) as total"))
+        .groupBy("c.fecha")
+        .orderBy("dia", "asc"),
+
+      db("movimientos_cuenta_proveedor as m")
+        .where("m.tipo", "pago")
+        .whereBetween("m.created_at", [`${desde} 00:00:00`, `${hasta} 23:59:59`])
+        .modify((q) => aplicarCorteCreated(q, "m.created_at", options))
+        .select(db.raw("DATE(m.created_at) as dia"), db.raw("COALESCE(SUM(m.monto), 0) as total"))
+        .groupByRaw("DATE(m.created_at)")
         .orderBy("dia", "asc"),
     ]);
 
@@ -394,6 +491,19 @@ const FinanzasRepository = {
       ingresosMap[k] = (ingresosMap[k] || 0) + Number(total);
     });
     const ingresos = Object.entries(ingresosMap)
+      .map(([dia, total]) => ({ dia, total }))
+      .sort((a, b) => a.dia.localeCompare(b.dia));
+
+    const comprasMap = {};
+    comprasCaja.forEach(({ dia, total }) => {
+      const k = String(dia).slice(0, 10);
+      comprasMap[k] = (comprasMap[k] || 0) + Number(total);
+    });
+    pagosProveedores.forEach(({ dia, total }) => {
+      const k = String(dia).slice(0, 10);
+      comprasMap[k] = (comprasMap[k] || 0) + Number(total);
+    });
+    const compras = Object.entries(comprasMap)
       .map(([dia, total]) => ({ dia, total }))
       .sort((a, b) => a.dia.localeCompare(b.dia));
 
@@ -427,12 +537,15 @@ const FinanzasRepository = {
     const vrCorte = buildCorteFechaYCreated("vr.fecha", "vr.created_at", options);
     const gastoCorte = buildCorteFechaYCreated("g.fecha", "g.created_at", options);
     const compraCorte = buildCorteFechaYCreated("c.fecha", "c.created_at", options);
+    const pagoProveedorCorte = buildCorteCreated("mcp.created_at", options);
     const titularCorte = buildCorteFechaYCreated("mc.fecha", "mc.created_at", options);
     const vrCountCorte = buildCorteFechaYCreated("fecha", "created_at", options);
     const deudaCountCorte = buildCorteCreated("created_at", options);
     const gastoCountCorte = buildCorteFechaYCreated("fecha", "created_at", options);
-    const compraCountCorte = buildCorteFechaYCreated("fecha", "created_at", options);
+    const compraCountCorte = buildCorteFechaYCreated("c.fecha", "c.created_at", options);
+    const pagoProveedorCountCorte = buildCorteCreated("created_at", options);
     const titularCountCorte = buildCorteFechaYCreated("fecha", "created_at", options);
+    const compraCajaWhere = buildSoloComprasCaja("c");
     const sql = `
       SELECT * FROM (
         SELECT 'ingreso' AS tipo, 'cobro' AS subtipo,
@@ -479,7 +592,19 @@ const FinanzasRepository = {
                COALESCE(p.nombre, 'Sin proveedor'), c.total, c.fecha,
                CONCAT('Compra a ', COALESCE(p.nombre, 'Sin proveedor'))
         FROM compras c LEFT JOIN proveedores p ON c.proveedor_id = p.id
-        WHERE c.fecha BETWEEN ? AND ?${compraCorte.sql}
+        WHERE c.fecha BETWEEN ? AND ?${compraCorte.sql}${compraCajaWhere}
+
+        UNION ALL
+
+        SELECT 'egreso', 'pago_proveedor',
+               COALESCE(p.nombre, 'Proveedor'), mcp.monto, mcp.created_at,
+               CONCAT('Pago a proveedor ', COALESCE(p.nombre, 'Sin proveedor'), ' - ',
+                 COALESCE(mcp.metodo_pago, 'efectivo'),
+                 CASE WHEN mcp.descripcion IS NOT NULL AND mcp.descripcion != ''
+                      THEN CONCAT(' - ', mcp.descripcion) ELSE '' END)
+        FROM movimientos_cuenta_proveedor mcp
+        LEFT JOIN proveedores p ON mcp.proveedor_id = p.id
+        WHERE mcp.tipo = 'pago' AND mcp.created_at BETWEEN ? AND ?${pagoProveedorCorte.sql}
 
         UNION ALL
 
@@ -506,6 +631,7 @@ const FinanzasRepository = {
       desde, hasta, ...vrCorte.params,
       desde, hasta, ...gastoCorte.params,
       desde, hasta, ...compraCorte.params,
+      `${desde} 00:00:00`, `${hasta} 23:59:59`, ...pagoProveedorCorte.params,
       desde, hasta, ...titularCorte.params,
       limit, offset,
     ]);
@@ -516,7 +642,8 @@ const FinanzasRepository = {
       ) + (SELECT COUNT(*) FROM deuda_abonos WHERE created_at BETWEEN ? AND ?${deudaCountCorte.sql})
         + (SELECT COUNT(*) FROM ventas_rapidas WHERE fecha BETWEEN ? AND ?${vrCountCorte.sql})
         + (SELECT COUNT(*) FROM gastos WHERE activo=1 AND fecha BETWEEN ? AND ?${gastoCountCorte.sql})
-        + (SELECT COUNT(*) FROM compras WHERE fecha BETWEEN ? AND ?${compraCountCorte.sql})
+        + (SELECT COUNT(*) FROM compras c WHERE c.fecha BETWEEN ? AND ?${compraCountCorte.sql}${compraCajaWhere})
+        + (SELECT COUNT(*) FROM movimientos_cuenta_proveedor WHERE tipo='pago' AND created_at BETWEEN ? AND ?${pagoProveedorCountCorte.sql})
         + (SELECT COUNT(*) FROM movimientos_caja WHERE activo=1 AND fecha BETWEEN ? AND ?${titularCountCorte.sql})
       AS total
     `;
@@ -527,6 +654,7 @@ const FinanzasRepository = {
       desde, hasta, ...vrCountCorte.params,
       desde, hasta, ...gastoCountCorte.params,
       desde, hasta, ...compraCountCorte.params,
+      `${desde} 00:00:00`, `${hasta} 23:59:59`, ...pagoProveedorCountCorte.params,
       desde, hasta, ...titularCountCorte.params,
     ]);
 
@@ -540,7 +668,9 @@ const FinanzasRepository = {
     const vrCorte = buildCorteFechaYCreated("vr.fecha", "vr.created_at", options);
     const gastoCorte = buildCorteFechaYCreated("g.fecha", "g.created_at", options);
     const compraCorte = buildCorteFechaYCreated("c.fecha", "c.created_at", options);
+    const pagoProveedorCorte = buildCorteCreated("mcp.created_at", options);
     const titularCorte = buildCorteFechaYCreated("mc.fecha", "mc.created_at", options);
+    const compraCajaWhere = buildSoloComprasCaja("c");
     const sql = `
       SELECT * FROM (
         SELECT 'ingreso' AS tipo, 'cobro' AS subtipo,
@@ -610,7 +740,20 @@ const FinanzasRepository = {
                c.created_at AS registrado_at,
                CONCAT('Compra a ', COALESCE(p.nombre, 'Sin proveedor')), NULL
         FROM compras c LEFT JOIN proveedores p ON c.proveedor_id = p.id
-        WHERE c.fecha BETWEEN ? AND ?${compraCorte.sql}
+        WHERE c.fecha BETWEEN ? AND ?${compraCorte.sql}${compraCajaWhere}
+
+        UNION ALL
+
+        SELECT 'egreso', 'pago_proveedor',
+               COALESCE(p.nombre, 'Proveedor'), mcp.monto, DATE(mcp.created_at) AS fecha,
+               mcp.created_at AS fecha_hora, mcp.created_at AS registrado_at,
+               CONCAT('Pago a proveedor ', COALESCE(p.nombre, 'Sin proveedor'),
+                 CASE WHEN mcp.descripcion IS NOT NULL AND mcp.descripcion != ''
+                      THEN CONCAT(' - ', mcp.descripcion) ELSE '' END),
+               COALESCE(mcp.metodo_pago, 'efectivo')
+        FROM movimientos_cuenta_proveedor mcp
+        LEFT JOIN proveedores p ON mcp.proveedor_id = p.id
+        WHERE mcp.tipo = 'pago' AND mcp.created_at BETWEEN ? AND ?${pagoProveedorCorte.sql}
 
         UNION ALL
 
@@ -638,6 +781,7 @@ const FinanzasRepository = {
       desde, hasta, ...vrCorte.params,
       desde, hasta, ...gastoCorte.params,
       desde, hasta, ...compraCorte.params,
+      `${desde} 00:00:00`, `${hasta} 23:59:59`, ...pagoProveedorCorte.params,
       desde, hasta, ...titularCorte.params,
     ]);
     return rows;
@@ -650,7 +794,9 @@ const FinanzasRepository = {
     const vrCorte = buildCorteFechaYCreated("vr.fecha", "vr.created_at", options);
     const gastoCorte = buildCorteFechaYCreated("g.fecha", "g.created_at", options);
     const compraCorte = buildCorteFechaYCreated("c.fecha", "c.created_at", options);
+    const pagoProveedorCorte = buildCorteCreated("mcp.created_at", options);
     const titularCorte = buildCorteFechaYCreated("mc.fecha", "mc.created_at", options);
+    const compraCajaWhere = buildSoloComprasCaja("c");
     const sql = `
       SELECT * FROM (
         SELECT 'ingreso' AS tipo, 'cobro' AS subtipo,
@@ -698,7 +844,19 @@ const FinanzasRepository = {
                c.total, c.fecha,
                CONCAT('Compra a ', COALESCE(p.nombre, 'Sin proveedor')), NULL
         FROM compras c LEFT JOIN proveedores p ON c.proveedor_id = p.id
-        WHERE c.fecha BETWEEN ? AND ?${compraCorte.sql}
+        WHERE c.fecha BETWEEN ? AND ?${compraCorte.sql}${compraCajaWhere}
+
+        UNION ALL
+
+        SELECT 'egreso', 'pago_proveedor', COALESCE(p.nombre, 'Proveedor'),
+               mcp.monto, mcp.created_at,
+               CONCAT('Pago a proveedor ', COALESCE(p.nombre, 'Sin proveedor'),
+                 CASE WHEN mcp.descripcion IS NOT NULL AND mcp.descripcion != ''
+                      THEN CONCAT(' - ', mcp.descripcion) ELSE '' END),
+               COALESCE(mcp.metodo_pago, 'efectivo')
+        FROM movimientos_cuenta_proveedor mcp
+        LEFT JOIN proveedores p ON mcp.proveedor_id = p.id
+        WHERE mcp.tipo = 'pago' AND mcp.created_at BETWEEN ? AND ?${pagoProveedorCorte.sql}
 
         UNION ALL
 
@@ -724,6 +882,7 @@ const FinanzasRepository = {
       desde, hasta, ...vrCorte.params,
       desde, hasta, ...gastoCorte.params,
       desde, hasta, ...compraCorte.params,
+      `${desde} 00:00:00`, `${hasta} 23:59:59`, ...pagoProveedorCorte.params,
       desde, hasta, ...titularCorte.params,
     ]);
     return rows;

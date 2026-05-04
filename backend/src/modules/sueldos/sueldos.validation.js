@@ -33,6 +33,10 @@ const actualizarPeriodoSchema = z.object({
 
 const adelantoSchema = z.object({
   monto: z.coerce.number().positive("El monto debe ser mayor a cero"),
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida")
+    .optional(),
   descripcion: z.string().trim().max(300).nullable().optional(),
   metodo_pago: metodoPagoSchema,
 });
