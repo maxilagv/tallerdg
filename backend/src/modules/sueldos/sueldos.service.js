@@ -6,6 +6,7 @@ const {
   abrirPeriodoSchema,
   actualizarPeriodoSchema,
   adelantoSchema,
+  anularAdelantoSchema,
   historialSchema,
 } = require("./sueldos.validation");
 
@@ -165,6 +166,30 @@ const SueldosService = {
     );
 
     return { adelanto, supera_saldo: supera, saldo_disponible: saldoDisponible };
+  },
+
+  async anularAdelanto(adelantoId, data, anuladoPorId) {
+    const id = parseId(adelantoId);
+    const parsed = anularAdelantoSchema.safeParse(data);
+
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message || "Datos invalidos.",
+        400,
+        "VALIDATION_ERROR"
+      );
+    }
+
+    if (!anuladoPorId) {
+      throw new AppError("No se pudo identificar al usuario que anula el adelanto.", 401, "UNAUTHORIZED");
+    }
+
+    try {
+      return await SueldosRepository.anularAdelanto(id, parsed.data, anuladoPorId);
+    } catch (err) {
+      const status = err.message === "Adelanto no encontrado." ? 404 : 400;
+      throw new AppError(err.message, status, "ADELANTO_ANULACION_ERROR");
+    }
   },
 
   async getHistorial(empleadoId, query) {

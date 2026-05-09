@@ -28,7 +28,7 @@ const transiciones = {
   abierta: ["en_proceso", "cancelada"],
   en_proceso: ["lista", "cancelada"],
   lista: ["cerrada", "en_proceso"],
-  cerrada: [],
+  cerrada: ["en_proceso"],
   cancelada: [],
 };
 
@@ -594,7 +594,15 @@ const OrdenesService = {
         payload.estado_pago = Number(orden.total) <= 0 ? "pagado" : orden.estado_pago || "sin_pagar";
       }
 
+      if (orden.estado === "cerrada" && parsed.data.estado !== "cerrada") {
+        payload.closed_at = null;
+      }
+
       await trx("ordenes").where({ id: ordenId }).update(payload);
+
+      if (orden.estado === "cerrada" && parsed.data.estado !== "cerrada") {
+        await trx("remitos").where({ orden_id: ordenId }).del();
+      }
 
       if (parsed.data.estado === "cerrada" && Number(orden.km_entrada) > 0) {
         await trx("vehiculos").where({ id: orden.vehiculo_id }).update({

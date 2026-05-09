@@ -5,6 +5,7 @@ import {
   CreditCard,
   Minus,
   Plus,
+  Printer,
   Search,
   ShoppingBag,
   Trash2,
@@ -15,6 +16,7 @@ import {
   ventasRapidasApi,
   type CreateVentaRapidaPayload,
   type MedioPago,
+  type VentaRapida,
 } from "../../features/ventas-rapidas/api";
 import { productosApi } from "../../features/productos/api";
 import { useDebounce } from "../../shared/hooks/useDebounce";
@@ -22,6 +24,7 @@ import { Button } from "../../shared/ui/Button";
 import { useToast } from "../../shared/ui/Toast";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { formatMoney } from "../../shared/utils/format";
+import { openPdfForPrint } from "../../shared/utils/printPdf";
 
 interface ItemCarrito {
   producto_id: number | null;
@@ -45,6 +48,7 @@ export function CajaRapidaPage() {
   const [medioPago, setMedioPago] = useState<MedioPago>("efectivo");
   const [notas, setNotas] = useState("");
   const [ventaOk, setVentaOk] = useState(false);
+  const [ultimaVenta, setUltimaVenta] = useState<VentaRapida | null>(null);
 
   const debouncedSearch = useDebounce(search, 250);
 
@@ -130,15 +134,30 @@ export function CajaRapidaPage() {
       };
       return ventasRapidasApi.crear(payload);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
+      const venta = res.data.data;
+      setUltimaVenta(venta);
       setVentaOk(true);
       queryClient.invalidateQueries({ queryKey: ["caja-saldo-hoy"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-resumen"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-por-dia"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
+      queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
       setTimeout(() => {
         setCarrito([]);
         setNotas("");
         setMedioPago("efectivo");
         setVentaOk(false);
       }, 2000);
+    },
+    onError: (error) => add(getErrorMessage(error), "error"),
+  });
+
+  const imprimirComprobanteMutation = useMutation({
+    mutationFn: (ventaId: number) => ventasRapidasApi.imprimirComprobante(ventaId),
+    onSuccess: ({ data }, ventaId) => {
+      openPdfForPrint(data, `caja-rapida-${ventaId}.pdf`);
     },
     onError: (error) => add(getErrorMessage(error), "error"),
   });
@@ -184,6 +203,27 @@ export function CajaRapidaPage() {
             </button>
           )}
         </div>
+
+        {ultimaVenta && (
+          <div className="flex flex-col justify-between gap-3 rounded-xl border border-green-500/25 bg-green-500/10 px-4 py-3 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-sm font-semibold text-green-200">
+                Ultima venta #{ultimaVenta.id} registrada
+              </p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                {formatMoney(ultimaVenta.total)} - {ultimaVenta.medio_pago}
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => imprimirComprobanteMutation.mutate(ultimaVenta.id)}
+              loading={imprimirComprobanteMutation.isPending}
+            >
+              <Printer size={15} /> Imprimir comprobante
+            </Button>
+          </div>
+        )}
 
         {/* Resultados */}
         {search && (

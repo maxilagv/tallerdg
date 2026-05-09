@@ -22,9 +22,12 @@ export interface Adelanto {
   periodo_id: number;
   empleado_id: number;
   monto: number;
+  metodo_pago?: MetodoPago | null;
   fecha: string;
   descripcion?: string | null;
   gasto_id?: number | null;
+  anulado_at?: string | null;
+  motivo_anulacion?: string | null;
   created_at: string;
 }
 
@@ -99,6 +102,9 @@ export const sueldosApi = {
       `/sueldos/periodos/${periodoId}/adelantos`,
       payload
     ),
+
+  anularAdelanto: (adelantoId: number, motivo: string) =>
+    api.post<{ ok: boolean; data: Adelanto }>(`/sueldos/adelantos/${adelantoId}/anular`, { motivo }),
 
   getHistorial: (empleadoId: number, params?: Record<string, unknown>) =>
     api.get<{ ok: boolean; data: HistorialResponse }>(`/sueldos/${empleadoId}/historial`, { params }),

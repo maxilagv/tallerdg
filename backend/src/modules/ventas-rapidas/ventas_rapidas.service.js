@@ -1,5 +1,7 @@
 const { z } = require("zod");
+const db = require("../../shared/db/knex");
 const AppError = require("../../shared/errors/AppError");
+const { generarVentaRapidaPDF } = require("../../shared/pdf/venta_rapida.template");
 const VentasRapidasRepository = require("./ventas_rapidas.repository");
 const {
   createVentaRapidaSchema,
@@ -44,6 +46,18 @@ const VentasRapidasService = {
     const { items, ...ventaData } = parsed.data;
     const ventaId = await VentasRapidasRepository.create(ventaData, items, empleadoId);
     return VentasRapidasRepository.findById(ventaId);
+  },
+
+  async generarComprobante(id) {
+    const venta = await this.obtener(id);
+    const rows = await db("configuracion").select("clave", "valor");
+    const configuracion = Object.fromEntries(rows.map((row) => [row.clave, row.valor]));
+    const pdfBuffer = await generarVentaRapidaPDF(venta, configuracion);
+
+    return {
+      numero: venta.id,
+      pdfBuffer,
+    };
   },
 };
 

@@ -139,6 +139,8 @@ export const ordenesApi = {
   ) => api.post<{ ok: boolean; data: Orden }>(`/ordenes/${id}/productos/batch`, { items }),
   quitarProducto: (id: number, itemId: number) =>
     api.delete<{ ok: boolean; data: Orden }>(`/ordenes/${id}/productos/${itemId}`),
+  imprimirOrdenTrabajo: (id: number) =>
+    api.get<Blob>(`/ordenes/${id}/orden-trabajo/pdf`, { responseType: "blob" }),
   descargarRemito: (id: number) =>
     api.get<Blob>(`/ordenes/${id}/remito/pdf`, { responseType: "blob" }),
 };

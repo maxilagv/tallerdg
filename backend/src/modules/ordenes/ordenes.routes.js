@@ -22,6 +22,7 @@ router.delete("/:id/servicios/:itemId", requirePermiso("ordenes", "w"), OrdenesC
 router.post("/:id/productos", requirePermiso("ordenes", "w"), OrdenesController.agregarProducto);
 router.post("/:id/productos/batch", requirePermiso("ordenes", "w"), OrdenesController.agregarProductosBatch);
 router.delete("/:id/productos/:itemId", requirePermiso("ordenes", "w"), OrdenesController.quitarProducto);
+router.get("/:id/orden-trabajo/pdf", requirePermiso("ordenes", "r"), OrdenesController.imprimirOrdenTrabajo);
 router.get("/:id/remito/pdf", requirePermiso("ordenes", "r"), OrdenesController.descargarRemito);
 router.delete("/:id", requirePermiso("ordenes", "w"), OrdenesController.eliminar);
 

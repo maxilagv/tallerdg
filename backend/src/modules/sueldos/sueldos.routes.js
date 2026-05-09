@@ -26,6 +26,7 @@ router.patch("/periodos/:periodoId", requirePermiso("empleados", "w"), SueldosCo
 router.post("/periodos/:periodoId/liquidar", requirePermiso("empleados", "w"), SueldosController.liquidar);
 
 // Adelantos
+router.post("/adelantos/:adelantoId/anular", requirePermiso("empleados", "w"), SueldosController.anularAdelanto);
 router.post("/periodos/:periodoId/adelantos", requirePermiso("empleados", "w"), SueldosController.registrarAdelanto);
 
 module.exports = router;

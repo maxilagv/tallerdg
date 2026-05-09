@@ -1,5 +1,6 @@
 const db = require("../../shared/db/knex");
 const AppError = require("../../shared/errors/AppError");
+const { generarOrdenTrabajoPDF } = require("../../shared/pdf/orden_trabajo.template");
 const { generarRemitoPDF } = require("../../shared/pdf/remito.template");
 const OrdenesRepository = require("../ordenes/ordenes.repository");
 const { generarNumeroRemito } = require("../ordenes/ordenes.helper");
@@ -10,6 +11,22 @@ async function getConfiguracion() {
 }
 
 const RemitosService = {
+  async generarOrdenTrabajo(ordenId) {
+    const orden = await OrdenesRepository.findByIdCompleta(ordenId);
+
+    if (!orden) {
+      throw new AppError("Trabajo no encontrado.", 404, "NOT_FOUND");
+    }
+
+    const configuracion = await getConfiguracion();
+    const pdfBuffer = await generarOrdenTrabajoPDF(orden, configuracion);
+
+    return {
+      numero: orden.numero,
+      pdfBuffer,
+    };
+  },
+
   async generarParaOrden(ordenId) {
     const orden = await OrdenesRepository.findByIdCompleta(ordenId);
 

@@ -41,6 +41,10 @@ const adelantoSchema = z.object({
   metodo_pago: metodoPagoSchema,
 });
 
+const anularAdelantoSchema = z.object({
+  motivo: z.string().trim().min(3, "Describe brevemente el motivo de anulacion").max(500),
+});
+
 const historialSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(12),
@@ -51,5 +55,6 @@ module.exports = {
   abrirPeriodoSchema,
   actualizarPeriodoSchema,
   adelantoSchema,
+  anularAdelantoSchema,
   historialSchema,
 };

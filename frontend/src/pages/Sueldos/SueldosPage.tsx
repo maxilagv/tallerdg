@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  Ban,
   CalendarClock,
   ChevronDown,
   ChevronUp,
@@ -9,7 +10,8 @@ import {
   Settings2,
   Wallet,
 } from "lucide-react";
-import { sueldosApi, periodoPagoLabel, type EmpleadoResumen } from "../../features/sueldos/api";
+import { metodoPagoLabels } from "../../features/pagos/api";
+import { sueldosApi, periodoPagoLabel, type Adelanto, type EmpleadoResumen } from "../../features/sueldos/api";
 import { Button } from "../../shared/ui/Button";
 import { Card } from "../../shared/ui/Card";
 import { EmptyState } from "../../shared/ui/EmptyState";
@@ -18,6 +20,7 @@ import { useToast } from "../../shared/ui/Toast";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { formatDate, formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 import { AdelantoModal } from "./AdelantoModal";
+import { AnularAdelantoModal } from "./AnularAdelantoModal";
 import { LiquidarModal } from "./LiquidarModal";
 import { PeriodoSueldoModal } from "./PeriodoSueldoModal";
 import { SueldoConfigModal } from "./SueldoConfigModal";
@@ -26,6 +29,7 @@ type ModalState =
   | { type: "config"; emp: EmpleadoResumen }
   | { type: "periodo"; emp: EmpleadoResumen }
   | { type: "adelanto"; emp: EmpleadoResumen }
+  | { type: "anular-adelanto"; emp: EmpleadoResumen; adelanto: Adelanto }
   | { type: "liquidar"; emp: EmpleadoResumen }
   | null;
 
@@ -59,6 +63,12 @@ export function SueldosPage() {
     queryClient.invalidateQueries({ queryKey: ["sueldos-resumen"] });
     queryClient.invalidateQueries({ queryKey: ["sueldos-historial"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard-hoy"] });
+    queryClient.invalidateQueries({ queryKey: ["finanzas-resumen"] });
+    queryClient.invalidateQueries({ queryKey: ["finanzas-por-dia"] });
+    queryClient.invalidateQueries({ queryKey: ["finanzas-categorias"] });
+    queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos"] });
+    queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
+    queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
   };
 
   const closeModal = () => setModal(null);
@@ -99,6 +109,7 @@ export function SueldosPage() {
               onConfig={() => setModal({ type: "config", emp })}
               onEditarPeriodo={() => setModal({ type: "periodo", emp })}
               onAdelanto={() => setModal({ type: "adelanto", emp })}
+              onAnularAdelanto={(adelanto) => setModal({ type: "anular-adelanto", emp, adelanto })}
               onLiquidar={() => setModal({ type: "liquidar", emp })}
               onAbrirPeriodo={async () => {
                 try {
@@ -158,6 +169,16 @@ export function SueldosPage() {
           empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
         />
       )}
+
+      {modal?.type === "anular-adelanto" && (
+        <AnularAdelantoModal
+          open
+          onClose={closeModal}
+          onSuccess={refresh}
+          adelanto={modal.adelanto}
+          empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
+        />
+      )}
     </div>
   );
 }
@@ -173,6 +194,7 @@ interface EmpleadoCardProps {
   onConfig: () => void;
   onEditarPeriodo: () => void;
   onAdelanto: () => void;
+  onAnularAdelanto: (adelanto: Adelanto) => void;
   onLiquidar: () => void;
   onAbrirPeriodo: () => void;
 }
@@ -188,6 +210,7 @@ function EmpleadoCard({
   onConfig,
   onEditarPeriodo,
   onAdelanto,
+  onAnularAdelanto,
   onLiquidar,
   onAbrirPeriodo,
 }: EmpleadoCardProps) {
@@ -307,6 +330,37 @@ function EmpleadoCard({
               {formatMoney(Math.max(0, saldoRestante))}
             </span>
           </div>
+
+          {periodo.adelantos?.length ? (
+            <div className="mt-4 overflow-hidden rounded-xl border border-border">
+              {periodo.adelantos.map((adelanto) => (
+                <div
+                  key={adelanto.id}
+                  className="flex flex-col justify-between gap-3 border-b border-border/50 bg-surface-2 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-red-300">
+                        {formatMoney(adelanto.monto)}
+                      </span>
+                      <span className="text-xs text-text-muted">{formatDate(adelanto.fecha)}</span>
+                      {adelanto.metodo_pago ? (
+                        <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-text-muted">
+                          {metodoPagoLabels[adelanto.metodo_pago]}
+                        </span>
+                      ) : null}
+                    </div>
+                    {adelanto.descripcion ? (
+                      <p className="mt-1 truncate text-xs text-text-muted">{adelanto.descripcion}</p>
+                    ) : null}
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => onAnularAdelanto(adelanto)}>
+                    <Ban size={14} /> Anular
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       )}
 

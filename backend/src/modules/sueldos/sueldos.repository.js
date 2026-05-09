@@ -105,10 +105,13 @@ const SueldosRepository = {
   },
 
   async getAdelantosDePeriodo(periodoId) {
-    return db("adelantos_sueldo")
-      .where({ periodo_id: periodoId })
-      .orderBy("fecha", "asc")
-      .orderBy("created_at", "asc");
+    return db("adelantos_sueldo as a")
+      .leftJoin("gastos as g", "a.gasto_id", "g.id")
+      .where("a.periodo_id", periodoId)
+      .whereNull("a.anulado_at")
+      .orderBy("a.fecha", "asc")
+      .orderBy("a.created_at", "asc")
+      .select("a.*", "g.metodo_pago");
   },
 
   async liquidarPeriodo(periodoId, pagadoPorEmpleadoId, metodoPago = "efectivo") {
@@ -119,6 +122,7 @@ const SueldosRepository = {
     const empleado = await db("empleados").where({ id: periodo.empleado_id }).first();
     const [{ total_adelantos }] = await db("adelantos_sueldo")
       .where({ periodo_id: periodoId })
+      .whereNull("anulado_at")
       .sum("monto as total_adelantos");
 
     const adelantos = Number(total_adelantos) || 0;
@@ -194,6 +198,48 @@ const SueldosRepository = {
     });
   },
 
+  async anularAdelanto(adelantoId, { motivo }, anuladoPorId) {
+    return db.transaction(async (trx) => {
+      const adelanto = await trx("adelantos_sueldo")
+        .where({ id: adelantoId })
+        .forUpdate()
+        .first();
+
+      if (!adelanto) throw new Error("Adelanto no encontrado.");
+      if (adelanto.anulado_at) throw new Error("El adelanto ya fue anulado.");
+
+      const periodo = await trx("periodos_sueldo")
+        .where({ id: adelanto.periodo_id })
+        .forUpdate()
+        .first();
+
+      if (!periodo) throw new Error("Periodo no encontrado.");
+      if (periodo.estado === "pagado") {
+        throw new Error("No se puede anular un adelanto de un periodo ya liquidado.");
+      }
+
+      await trx("adelantos_sueldo").where({ id: adelantoId }).update({
+        anulado_at: trx.fn.now(),
+        anulado_por_empleado_id: anuladoPorId || null,
+        motivo_anulacion: motivo,
+        updated_at: trx.fn.now(),
+      });
+
+      if (adelanto.gasto_id) {
+        await trx("gastos").where({ id: adelanto.gasto_id }).update({
+          activo: 0,
+          updated_at: trx.fn.now(),
+        });
+      }
+
+      return trx("adelantos_sueldo as a")
+        .leftJoin("gastos as g", "a.gasto_id", "g.id")
+        .where("a.id", adelantoId)
+        .select("a.*", "g.metodo_pago")
+        .first();
+    });
+  },
+
   async getResumenEmpleados() {
     const empleados = await db("empleados as e")
       .join("roles as r", "e.rol_id", "r.id")
@@ -216,12 +262,16 @@ const SueldosRepository = {
         if (periodoAbierto) {
           const [{ suma }] = await db("adelantos_sueldo")
             .where({ periodo_id: periodoAbierto.id })
+            .whereNull("anulado_at")
             .sum("monto as suma");
           adelantos = Number(suma) || 0;
-          adelantosDetalle = await db("adelantos_sueldo")
-            .where({ periodo_id: periodoAbierto.id })
-            .orderBy("fecha", "desc")
-            .orderBy("created_at", "desc");
+          adelantosDetalle = await db("adelantos_sueldo as a")
+            .leftJoin("gastos as g", "a.gasto_id", "g.id")
+            .where("a.periodo_id", periodoAbierto.id)
+            .whereNull("a.anulado_at")
+            .orderBy("a.fecha", "desc")
+            .orderBy("a.created_at", "desc")
+            .select("a.*", "g.metodo_pago");
         }
 
         return {
@@ -254,6 +304,7 @@ const SueldosRepository = {
       rows.map(async (periodo) => {
         const [{ suma }] = await db("adelantos_sueldo")
           .where({ periodo_id: periodo.id })
+          .whereNull("anulado_at")
           .sum("monto as suma");
         return { ...periodo, total_adelantos: Number(suma) || 0 };
       })

@@ -9,8 +9,8 @@ const refineRangoMsg = {
   path: ["desde"],
 };
 
-const booleanQueryDefaultTrue = z.preprocess((value) => {
-  if (value === undefined) return true;
+const booleanQueryDefaultFalse = z.preprocess((value) => {
+  if (value === undefined) return false;
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
     const normalized = value.trim().toLowerCase();
@@ -31,7 +31,7 @@ const resumenSchema = z
   .object({
     desde: z.string().min(1, "La fecha desde es obligatoria"),
     hasta: z.string().min(1, "La fecha hasta es obligatoria"),
-    caja_inicia_en_cero: booleanQueryDefaultTrue,
+    caja_inicia_en_cero: booleanQueryDefaultFalse,
   })
   .refine(refineRango, refineRangoMsg);
 

@@ -87,7 +87,7 @@ const FinanzasRepository = {
 
   // ── Resumen del período ───────────────────────────────────────────────────
   async getResumen(desde, hasta, options = {}) {
-    const cajaIniciaEnCero = options.cajaIniciaEnCero !== false;
+    const cajaIniciaEnCero = false;
     const [
       cobros,
       cobrosPorMetodo,
@@ -353,7 +353,7 @@ const FinanzasRepository = {
       totalRetirosArrastre -
       totalPagosProveedoresEfectivoArrastre;
 
-    const saldoEfectivoInicial = cajaIniciaEnCero ? 0 : saldoEfectivoArrastre;
+    const saldoEfectivoInicial = saldoEfectivoArrastre;
 
     // Saldo físico en caja = inicio elegido + lo que entró/salió en efectivo
     const saldoEfectivo =

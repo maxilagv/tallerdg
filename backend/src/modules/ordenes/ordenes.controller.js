@@ -82,6 +82,13 @@ const OrdenesController = {
     return res.json({ ok: true, message: "Orden eliminada correctamente." });
   },
 
+  async imprimirOrdenTrabajo(req, res) {
+    const { numero, pdfBuffer } = await RemitosService.generarOrdenTrabajo(Number(req.params.id));
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="orden-trabajo-${numero}.pdf"`);
+    return res.send(pdfBuffer);
+  },
+
   async descargarRemito(req, res) {
     const { numero, pdfBuffer } = await RemitosService.generarParaOrden(Number(req.params.id));
     res.setHeader("Content-Type", "application/pdf");

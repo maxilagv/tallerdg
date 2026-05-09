@@ -27,7 +27,7 @@ const SueldosController = {
   },
 
   async liquidar(req, res) {
-    const data = await SueldosService.liquidar(req.params.periodoId, req.body, req.empleado?.id);
+    const data = await SueldosService.liquidar(req.params.periodoId, req.body, req.user?.id);
     return res.json({ ok: true, data });
   },
 
@@ -35,9 +35,14 @@ const SueldosController = {
     const data = await SueldosService.registrarAdelanto(
       req.params.periodoId,
       req.body,
-      req.empleado?.id
+      req.user?.id
     );
     return res.status(201).json({ ok: true, data });
+  },
+
+  async anularAdelanto(req, res) {
+    const data = await SueldosService.anularAdelanto(req.params.adelantoId, req.body, req.user?.id);
+    return res.json({ ok: true, data, message: "Adelanto anulado." });
   },
 
   async getHistorial(req, res) {

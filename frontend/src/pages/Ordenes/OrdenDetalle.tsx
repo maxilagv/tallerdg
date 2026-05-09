@@ -10,6 +10,7 @@ import {
   Download,
   Pencil,
   Package,
+  Printer,
   Save,
   Trash2,
   User,
@@ -37,6 +38,7 @@ import { Skeleton } from "../../shared/ui/Skeleton";
 import { useToast } from "../../shared/ui/Toast";
 import { formatDate, formatDateTime, formatMoney } from "../../shared/utils/format";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
+import { openPdfForPrint } from "../../shared/utils/printPdf";
 import { AnularPagoModal } from "../Cobros/AnularPagoModal";
 import { RegistrarPagoModal } from "../Cobros/RegistrarPagoModal";
 import { AgregarProductoModal } from "./AgregarProductoModal";
@@ -90,7 +92,9 @@ const accionesPorEstado: Record<
     { label: "Entregar y cerrar", estado: "cerrada", variant: "primary" },
     { label: "Volver a proceso", estado: "en_proceso", variant: "secondary" },
   ],
-  cerrada: [],
+  cerrada: [
+    { label: "Reabrir trabajo", estado: "en_proceso", variant: "secondary" },
+  ],
   cancelada: [],
 };
 
@@ -279,6 +283,14 @@ export function OrdenDetalle() {
     onError: (error) => add(getErrorMessage(error), "error"),
   });
 
+  const imprimirOrdenMutation = useMutation({
+    mutationFn: () => ordenesApi.imprimirOrdenTrabajo(Number(id)),
+    onSuccess: ({ data }) => {
+      openPdfForPrint(data, `orden-trabajo-${orden?.numero || "orden"}.pdf`);
+    },
+    onError: (error) => add(getErrorMessage(error), "error"),
+  });
+
   if (ordenQuery.isLoading) {
     return (
       <div className="space-y-4">
@@ -346,6 +358,14 @@ export function OrdenDetalle() {
               <CreditCard size={16} /> {botonCobroLabel}
             </Button>
           ) : null}
+
+          <Button
+            variant="secondary"
+            onClick={() => imprimirOrdenMutation.mutate()}
+            loading={imprimirOrdenMutation.isPending}
+          >
+            <Printer size={16} /> Imprimir orden
+          </Button>
 
           {accionesPorEstado[orden.estado].map((accion) => (
             <Button

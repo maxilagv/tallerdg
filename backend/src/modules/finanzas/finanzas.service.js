@@ -270,10 +270,10 @@ function parseEstadoResetCaja(config = {}) {
   };
 }
 
-async function getOpcionesCaja(cajaIniciaEnCero = true) {
+async function getOpcionesCaja() {
   const estado = parseEstadoResetCaja(await ConfiguracionService.obtener());
   return {
-    cajaIniciaEnCero,
+    cajaIniciaEnCero: false,
     cajaResetFecha: estado.fecha,
     cajaResetAt: estado.reset_at,
   };
@@ -288,7 +288,7 @@ const FinanzasService = {
   async resumen(query) {
     const parsed = resumenSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Parámetros inválidos.", 400, "VALIDATION_ERROR");
-    const opciones = await getOpcionesCaja(parsed.data.caja_inicia_en_cero);
+    const opciones = await getOpcionesCaja();
     return FinanzasRepository.getResumen(parsed.data.desde, parsed.data.hasta, opciones);
   },
 
@@ -392,7 +392,7 @@ const FinanzasService = {
   async exportarExcel(query) {
     const parsed = resumenSchema.safeParse(query);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Fechas inválidas.", 400, "VALIDATION_ERROR");
-    const { desde, hasta, caja_inicia_en_cero: cajaIniciaEnCero } = parsed.data;
+    const { desde, hasta } = parsed.data;
 
     // Límite de 6 meses para evitar timeouts y archivos excesivamente grandes.
     const SEIS_MESES_MS = 6 * 30 * 24 * 60 * 60 * 1000;
@@ -404,7 +404,7 @@ const FinanzasService = {
       );
     }
 
-    const opciones = await getOpcionesCaja(cajaIniciaEnCero);
+    const opciones = await getOpcionesCaja();
     const [resumen, movimientos, porCategoria, porDia, analisis, config] = await Promise.all([
       FinanzasRepository.getResumen(desde, hasta, opciones),
       FinanzasRepository.getMovimientosTodos(desde, hasta, opciones),

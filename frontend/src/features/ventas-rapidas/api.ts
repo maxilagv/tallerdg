@@ -62,4 +62,7 @@ export const ventasRapidasApi = {
 
   crear: (payload: CreateVentaRapidaPayload) =>
     api.post<{ ok: boolean; data: VentaRapida }>("/ventas-rapidas", payload),
+
+  imprimirComprobante: (id: number) =>
+    api.get<Blob>(`/ventas-rapidas/${id}/comprobante/pdf`, { responseType: "blob" }),
 };
