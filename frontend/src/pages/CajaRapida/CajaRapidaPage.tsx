@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Banknote,
@@ -18,6 +18,7 @@ import {
   type MedioPago,
   type VentaRapida,
 } from "../../features/ventas-rapidas/api";
+import { configuracionApi } from "../../features/configuracion/api";
 import { productosApi } from "../../features/productos/api";
 import { useDebounce } from "../../shared/hooks/useDebounce";
 import { Button } from "../../shared/ui/Button";
@@ -46,9 +47,11 @@ export function CajaRapidaPage() {
   const [search, setSearch] = useState("");
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
   const [medioPago, setMedioPago] = useState<MedioPago>("efectivo");
+  const [ivaPorcentaje, setIvaPorcentaje] = useState("0");
   const [notas, setNotas] = useState("");
   const [ventaOk, setVentaOk] = useState(false);
   const [ultimaVenta, setUltimaVenta] = useState<VentaRapida | null>(null);
+  const ivaInicializadoRef = useRef(false);
 
   const debouncedSearch = useDebounce(search, 250);
 
@@ -57,6 +60,21 @@ export function CajaRapidaPage() {
     queryFn: () => ventasRapidasApi.saldoCajaHoy(),
     refetchInterval: 30_000,
   });
+
+  const configuracionQuery = useQuery({
+    queryKey: ["configuracion"],
+    queryFn: () => configuracionApi.obtener(),
+    staleTime: 5 * 60_000,
+  });
+
+  useEffect(() => {
+    if (ivaInicializadoRef.current || !configuracionQuery.data) {
+      return;
+    }
+
+    setIvaPorcentaje(String(configuracionQuery.data.data.data.iva_porcentaje_default ?? "0"));
+    ivaInicializadoRef.current = true;
+  }, [configuracionQuery.data]);
 
   const productosQuery = useQuery({
     queryKey: ["caja-rapida-productos", debouncedSearch],
@@ -116,13 +134,17 @@ export function CajaRapidaPage() {
   const quitar = (idx: number) =>
     setCarrito((prev) => prev.filter((_, i) => i !== idx));
 
-  const total = carrito.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+  const subtotal = carrito.reduce((s, i) => s + i.cantidad * i.precio_unitario, 0);
+  const ivaNum = Math.min(100, Math.max(0, Number(ivaPorcentaje) || 0));
+  const ivaMonto = Math.round(subtotal * (ivaNum / 100) * 100) / 100;
+  const total = Math.round((subtotal + ivaMonto) * 100) / 100;
 
   const mutation = useMutation({
     mutationFn: () => {
       const payload: CreateVentaRapidaPayload = {
         fecha: new Date().toISOString().slice(0, 10),
         medio_pago: medioPago,
+        iva_porcentaje: ivaNum,
         notas: notas || null,
         items: carrito.map((i) => ({
           producto_id: i.producto_id || undefined,
@@ -148,6 +170,7 @@ export function CajaRapidaPage() {
         setCarrito([]);
         setNotas("");
         setMedioPago("efectivo");
+        setIvaPorcentaje(String(configuracionQuery.data?.data.data.iva_porcentaje_default ?? "0"));
         setVentaOk(false);
       }, 2000);
     },
@@ -288,6 +311,9 @@ export function CajaRapidaPage() {
               carrito={carrito}
               medioPago={medioPago}
               notas={notas}
+              ivaPorcentaje={ivaPorcentaje}
+              subtotal={subtotal}
+              ivaMonto={ivaMonto}
               total={total}
               canConfirm={canConfirm}
               ventaOk={ventaOk}
@@ -295,6 +321,7 @@ export function CajaRapidaPage() {
               onActualizar={actualizar}
               onQuitar={quitar}
               onMedioPago={setMedioPago}
+              onIvaPorcentaje={setIvaPorcentaje}
               onNotas={setNotas}
               onConfirmar={() => mutation.mutate()}
             />
@@ -308,6 +335,9 @@ export function CajaRapidaPage() {
           carrito={carrito}
           medioPago={medioPago}
           notas={notas}
+          ivaPorcentaje={ivaPorcentaje}
+          subtotal={subtotal}
+          ivaMonto={ivaMonto}
           total={total}
           canConfirm={canConfirm}
           ventaOk={ventaOk}
@@ -315,6 +345,7 @@ export function CajaRapidaPage() {
           onActualizar={actualizar}
           onQuitar={quitar}
           onMedioPago={setMedioPago}
+          onIvaPorcentaje={setIvaPorcentaje}
           onNotas={setNotas}
           onConfirmar={() => mutation.mutate()}
         />
@@ -329,6 +360,9 @@ interface CarritoPanelProps {
   carrito: ItemCarrito[];
   medioPago: MedioPago;
   notas: string;
+  ivaPorcentaje: string;
+  subtotal: number;
+  ivaMonto: number;
   total: number;
   canConfirm: boolean;
   ventaOk: boolean;
@@ -336,6 +370,7 @@ interface CarritoPanelProps {
   onActualizar: (idx: number, field: "cantidad" | "precio_unitario", value: number) => void;
   onQuitar: (idx: number) => void;
   onMedioPago: (v: MedioPago) => void;
+  onIvaPorcentaje: (v: string) => void;
   onNotas: (v: string) => void;
   onConfirmar: () => void;
 }
@@ -344,6 +379,9 @@ function CarritoPanel({
   carrito,
   medioPago,
   notas,
+  ivaPorcentaje,
+  subtotal,
+  ivaMonto,
   total,
   canConfirm,
   ventaOk,
@@ -351,6 +389,7 @@ function CarritoPanel({
   onActualizar,
   onQuitar,
   onMedioPago,
+  onIvaPorcentaje,
   onNotas,
   onConfirmar,
 }: CarritoPanelProps) {
@@ -471,10 +510,45 @@ function CarritoPanel({
           className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2 text-sm text-text outline-none transition focus:border-primary resize-none"
         />
 
+        <div>
+          <label className="mb-2 block text-xs font-semibold uppercase text-text-muted">
+            IVA
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={ivaPorcentaje}
+              onChange={(e) => onIvaPorcentaje(e.target.value)}
+              onBlur={() => {
+                const value = Number(ivaPorcentaje);
+                if (isNaN(value) || value < 0) onIvaPorcentaje("0");
+                else if (value > 100) onIvaPorcentaje("100");
+              }}
+              className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2 pr-8 text-right text-sm text-text outline-none transition focus:border-primary"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">%</span>
+          </div>
+        </div>
+
         {/* Total */}
-        <div className="flex items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
-          <span className="text-sm font-medium text-text-muted">Total</span>
-          <span className="text-2xl font-bold text-text">{formatMoney(total)}</span>
+        <div className="space-y-2 rounded-xl bg-surface-2 px-4 py-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-text-muted">Subtotal</span>
+            <span className="font-medium text-text">{formatMoney(subtotal)}</span>
+          </div>
+          {ivaMonto > 0 ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-text-muted">IVA</span>
+              <span className="font-medium text-text">{formatMoney(ivaMonto)}</span>
+            </div>
+          ) : null}
+          <div className="flex items-center justify-between border-t border-border/60 pt-2">
+            <span className="text-sm font-medium text-text-muted">Total</span>
+            <span className="text-2xl font-bold text-text">{formatMoney(total)}</span>
+          </div>
         </div>
 
         {/* Confirmar */}

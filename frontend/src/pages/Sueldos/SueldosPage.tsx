@@ -44,6 +44,7 @@ export function SueldosPage() {
   const { add } = useToast();
   const [modal, setModal] = useState<ModalState>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [adelantosExpandedIds, setAdelantosExpandedIds] = useState<number[]>([]);
   const [fechaInicio, setFechaInicio] = useState(toLocalDateInputValue());
 
   const query = useQuery({
@@ -101,11 +102,17 @@ export function SueldosPage() {
               key={emp.id}
               emp={emp}
               expanded={expandedId === emp.id}
+              adelantosExpanded={adelantosExpandedIds.includes(emp.id)}
               historial={expandedId === emp.id ? historialQuery.data?.data.data : undefined}
               historialLoading={expandedId === emp.id && historialQuery.isLoading}
               fechaInicio={fechaInicio}
               onFechaInicio={setFechaInicio}
               onToggleExpand={() => setExpandedId((value) => (value === emp.id ? null : emp.id))}
+              onToggleAdelantos={() =>
+                setAdelantosExpandedIds((ids) =>
+                  ids.includes(emp.id) ? ids.filter((id) => id !== emp.id) : [...ids, emp.id]
+                )
+              }
               onConfig={() => setModal({ type: "config", emp })}
               onEditarPeriodo={() => setModal({ type: "periodo", emp })}
               onAdelanto={() => setModal({ type: "adelanto", emp })}
@@ -186,11 +193,13 @@ export function SueldosPage() {
 interface EmpleadoCardProps {
   emp: EmpleadoResumen;
   expanded: boolean;
+  adelantosExpanded: boolean;
   historial: { rows: any[]; total: number } | undefined;
   historialLoading: boolean;
   fechaInicio: string;
   onFechaInicio: (value: string) => void;
   onToggleExpand: () => void;
+  onToggleAdelantos: () => void;
   onConfig: () => void;
   onEditarPeriodo: () => void;
   onAdelanto: () => void;
@@ -202,11 +211,13 @@ interface EmpleadoCardProps {
 function EmpleadoCard({
   emp,
   expanded,
+  adelantosExpanded,
   historial,
   historialLoading,
   fechaInicio,
   onFechaInicio,
   onToggleExpand,
+  onToggleAdelantos,
   onConfig,
   onEditarPeriodo,
   onAdelanto,
@@ -332,33 +343,58 @@ function EmpleadoCard({
           </div>
 
           {periodo.adelantos?.length ? (
-            <div className="mt-4 overflow-hidden rounded-xl border border-border">
-              {periodo.adelantos.map((adelanto) => (
-                <div
-                  key={adelanto.id}
-                  className="flex flex-col justify-between gap-3 border-b border-border/50 bg-surface-2 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center"
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-red-300">
-                        {formatMoney(adelanto.monto)}
-                      </span>
-                      <span className="text-xs text-text-muted">{formatDate(adelanto.fecha)}</span>
-                      {adelanto.metodo_pago ? (
-                        <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-text-muted">
-                          {metodoPagoLabels[adelanto.metodo_pago]}
-                        </span>
-                      ) : null}
-                    </div>
-                    {adelanto.descripcion ? (
-                      <p className="mt-1 truncate text-xs text-text-muted">{adelanto.descripcion}</p>
-                    ) : null}
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => onAnularAdelanto(adelanto)}>
-                    <Ban size={14} /> Anular
-                  </Button>
+            <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface-2">
+              <button
+                type="button"
+                onClick={onToggleAdelantos}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-surface-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-text">Detalle de adelantos</p>
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    {periodo.adelantos.length} movimiento{periodo.adelantos.length !== 1 ? "s" : ""} registrados
+                  </p>
                 </div>
-              ))}
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-red-300">{formatMoney(adelantos)}</span>
+                  {adelantosExpanded ? (
+                    <ChevronUp size={18} className="text-text-muted" />
+                  ) : (
+                    <ChevronDown size={18} className="text-text-muted" />
+                  )}
+                </div>
+              </button>
+
+              {adelantosExpanded ? (
+                <div className="border-t border-border">
+                  {periodo.adelantos.map((adelanto) => (
+                    <div
+                      key={adelanto.id}
+                      className="flex flex-col justify-between gap-3 border-b border-border/50 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-red-300">
+                            {formatMoney(adelanto.monto)}
+                          </span>
+                          <span className="text-xs text-text-muted">{formatDate(adelanto.fecha)}</span>
+                          {adelanto.metodo_pago ? (
+                            <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-text-muted">
+                              {metodoPagoLabels[adelanto.metodo_pago]}
+                            </span>
+                          ) : null}
+                        </div>
+                        {adelanto.descripcion ? (
+                          <p className="mt-1 truncate text-xs text-text-muted">{adelanto.descripcion}</p>
+                        ) : null}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => onAnularAdelanto(adelanto)}>
+                        <Ban size={14} /> Anular
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

@@ -10,6 +10,7 @@ export interface ConfiguracionData {
   orden_prefijo: string;
   remito_prefijo: string;
   stock_minimo_default: string;
+  iva_porcentaje_default: string;
 }
 
 export interface LogoUploadResponse {

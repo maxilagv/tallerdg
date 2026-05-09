@@ -22,6 +22,8 @@ export interface VentaRapidaItem {
 export interface VentaRapida {
   id: number;
   fecha: string;
+  iva_porcentaje: number;
+  iva_monto: number;
   total: number;
   medio_pago: MedioPago;
   notas?: string | null;
@@ -40,6 +42,7 @@ export interface VentasRapidasListResponse {
 export interface CreateVentaRapidaPayload {
   fecha: string;
   medio_pago: MedioPago;
+  iva_porcentaje?: number;
   notas?: string | null;
   items: Array<{
     producto_id?: number | null;

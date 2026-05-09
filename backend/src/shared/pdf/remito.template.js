@@ -135,6 +135,17 @@ async function generarRemitoPDF(orden, configuracion) {
       doc.text(`- ${appendMoney(symbol, orden.descuento)}`, 440, cursorY, { width: 110, align: "right" });
     }
 
+    if (Number(orden.iva_monto) > 0) {
+      const baseImponible = Math.max(0, Number(orden.subtotal) - Number(orden.descuento || 0));
+      cursorY += 14;
+      doc.fillColor("#4b5563").text("Base imponible:", 385, cursorY);
+      doc.text(appendMoney(symbol, baseImponible), 440, cursorY, { width: 110, align: "right" });
+
+      cursorY += 14;
+      doc.text(`IVA ${Number(orden.iva_porcentaje || 0).toLocaleString("es-AR")}%:`, 385, cursorY);
+      doc.text(appendMoney(symbol, orden.iva_monto), 440, cursorY, { width: 110, align: "right" });
+    }
+
     cursorY += 18;
     doc.rect(380, cursorY - 4, 175, 24).fill("#1f2937");
     doc

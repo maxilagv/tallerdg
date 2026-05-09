@@ -18,6 +18,7 @@ const {
   estadoOrdenSchema,
   notasOrdenSchema,
   descuentoOrdenSchema,
+  ivaOrdenSchema,
   recordatorioServiceSchema,
   updateOrdenSchema,
 } = require("./ordenes.validation");
@@ -182,6 +183,7 @@ const OrdenesService = {
         empleado_id: parsed.data.empleado_id || usuarioId || null,
         km_entrada: parsed.data.km_entrada || 0,
         notas_cliente: parsed.data.notas_cliente || null,
+        iva_porcentaje: parsed.data.iva_porcentaje || 0,
         adelanto,
         adelanto_metodo: adelantoMetodo,
         ...(parsed.data.fecha_ingreso && { created_at: normalizarFechaMovimiento(parsed.data.fecha_ingreso) }),
@@ -660,6 +662,28 @@ const OrdenesService = {
 
       await trx("ordenes").where({ id: ordenId }).update({
         descuento: parsed.data.descuento,
+        updated_at: trx.fn.now(),
+      });
+
+      await recalcularTotales(ordenId, trx);
+    });
+
+    return this.obtener(ordenId);
+  },
+
+  async aplicarIva(id, data) {
+    const ordenId = parseId(id);
+    const parsed = ivaOrdenSchema.safeParse(data);
+
+    if (!parsed.success) {
+      throw new AppError(parsed.error.issues[0]?.message || "Datos invÃ¡lidos.", 400, "VALIDATION_ERROR");
+    }
+
+    await db.transaction(async (trx) => {
+      await ensureOrdenEditable(ordenId, trx);
+
+      await trx("ordenes").where({ id: ordenId }).update({
+        iva_porcentaje: parsed.data.iva_porcentaje,
         updated_at: trx.fn.now(),
       });
 

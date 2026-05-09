@@ -28,6 +28,7 @@ const defaultValues: ConfiguracionData = {
   orden_prefijo: "ORD",
   remito_prefijo: "REM",
   stock_minimo_default: "5",
+  iva_porcentaje_default: "21",
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -177,6 +178,15 @@ export function ConfiguracionPage() {
               hint='Aparece antes de todos los montos. Ejemplo: "$", "USD", "€".'
               maxLength={10}
               {...register("moneda_simbolo")}
+            />
+            <Input
+              label="IVA predeterminado (%)"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              hint="Se precarga en ordenes y caja rapida; puede cambiarse en cada operacion."
+              {...register("iva_porcentaje_default")}
             />
           </SeccionConfig>
 

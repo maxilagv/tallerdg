@@ -14,6 +14,7 @@ const configuracionSchema = z
     orden_prefijo: z.string().trim().max(10).optional(),
     remito_prefijo: z.string().trim().max(10).optional(),
     stock_minimo_default: z.string().trim().max(10).optional(),
+    iva_porcentaje_default: z.coerce.number().min(0).max(100).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: "No hay cambios para guardar.",
@@ -26,7 +27,7 @@ function rowsToObject(rows) {
 function serializeEntries(data) {
   return Object.entries(data).map(([clave, valor]) => ({
     clave,
-    valor: valor ?? "",
+    valor: valor == null ? "" : String(valor),
   }));
 }
 

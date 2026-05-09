@@ -103,6 +103,11 @@ exports.seed = async function seed(knex) {
       descripcion: "Stock mínimo predeterminado para productos",
     },
     {
+      clave: "iva_porcentaje_default",
+      valor: "21",
+      descripcion: "Porcentaje de IVA sugerido por defecto",
+    },
+    {
       clave: "wsp_activo",
       valor: "1",
       descripcion: "WhatsApp activado (1=si, 0=no)",

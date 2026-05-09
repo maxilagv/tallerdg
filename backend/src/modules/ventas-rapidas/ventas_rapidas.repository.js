@@ -1,16 +1,25 @@
 const db = require("../../shared/db/knex");
 const AppError = require("../../shared/errors/AppError");
 
+function normalizarImporte(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
 const VentasRapidasRepository = {
   async create(data, items, empleadoId) {
     return db.transaction(async (trx) => {
-      const total = items.reduce(
+      const subtotal = items.reduce(
         (s, i) => s + Number(i.cantidad) * Number(i.precio_unitario),
         0
       );
+      const ivaPorcentaje = Number(data.iva_porcentaje) || 0;
+      const ivaMonto = normalizarImporte(subtotal * (ivaPorcentaje / 100));
+      const total = normalizarImporte(subtotal + ivaMonto);
 
       const [ventaId] = await trx("ventas_rapidas").insert({
         fecha: data.fecha,
+        iva_porcentaje: ivaPorcentaje,
+        iva_monto: ivaMonto,
         total,
         medio_pago: data.medio_pago || "efectivo",
         notas: data.notas || null,
@@ -88,6 +97,8 @@ const VentasRapidasRepository = {
         .select(
           "v.id",
           "v.fecha",
+          "v.iva_porcentaje",
+          "v.iva_monto",
           "v.total",
           "v.medio_pago",
           "v.notas",

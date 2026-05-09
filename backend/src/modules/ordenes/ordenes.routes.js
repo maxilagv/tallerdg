@@ -15,6 +15,7 @@ router.put("/:id", requirePermiso("ordenes", "w"), OrdenesController.actualizar)
 router.put("/:id/estado", requirePermiso("ordenes", "w"), OrdenesController.cambiarEstado);
 router.put("/:id/notas", requirePermiso("ordenes", "w"), OrdenesController.actualizarNotas);
 router.put("/:id/descuento", requirePermiso("ordenes", "w"), OrdenesController.aplicarDescuento);
+router.put("/:id/iva", requirePermiso("ordenes", "w"), OrdenesController.aplicarIva);
 router.put("/:id/recordatorio-service", requirePermiso("ordenes", "w"), OrdenesController.actualizarRecordatorioService);
 router.delete("/:id/recordatorio-service", requirePermiso("ordenes", "w"), OrdenesController.eliminarRecordatorioService);
 router.post("/:id/servicios", requirePermiso("ordenes", "w"), OrdenesController.agregarServicio);

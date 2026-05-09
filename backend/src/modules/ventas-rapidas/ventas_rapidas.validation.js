@@ -5,6 +5,11 @@ const MEDIOS_PAGO = ["efectivo", "tarjeta", "transferencia", "otro"];
 const createVentaRapidaSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   medio_pago: z.enum(MEDIOS_PAGO).default("efectivo"),
+  iva_porcentaje: z.coerce
+    .number()
+    .min(0, "El IVA no puede ser negativo")
+    .max(100, "El IVA no puede superar el 100%")
+    .default(0),
   notas: z.string().trim().max(500).nullable().optional(),
   items: z
     .array(

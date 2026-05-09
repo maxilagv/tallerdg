@@ -99,6 +99,18 @@ async function generarVentaRapidaPDF(venta, configuracion) {
     doc.moveTo(32, cursorY).lineTo(563, cursorY).strokeColor("#d1d5db").stroke();
     cursorY += 16;
 
+    const subtotal = (venta.items || []).reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    doc.fontSize(9).font("Helvetica").fillColor("#4b5563");
+    doc.text("Subtotal:", 385, cursorY);
+    doc.text(appendMoney(symbol, subtotal), 455, cursorY, { width: 95, align: "right" });
+
+    if (Number(venta.iva_monto) > 0) {
+      cursorY += 14;
+      doc.text(`IVA ${Number(venta.iva_porcentaje || 0).toLocaleString("es-AR")}%:`, 385, cursorY);
+      doc.text(appendMoney(symbol, venta.iva_monto), 455, cursorY, { width: 95, align: "right" });
+    }
+
+    cursorY += 22;
     doc.rect(385, cursorY - 6, 178, 28).fill("#1f2937");
     doc
       .fillColor("#ffffff")

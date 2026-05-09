@@ -67,6 +67,11 @@ const OrdenesController = {
     return res.json({ ok: true, data });
   },
 
+  async aplicarIva(req, res) {
+    const data = await OrdenesService.aplicarIva(req.params.id, req.body);
+    return res.json({ ok: true, data });
+  },
+
   async actualizarRecordatorioService(req, res) {
     const data = await OrdenesService.actualizarRecordatorioService(req.params.id, req.body);
     return res.json({ ok: true, data });

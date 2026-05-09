@@ -15,6 +15,11 @@ const createOrdenSchema = z.object({
   fecha_ingreso: z.string().trim().min(1).optional(),
   km_entrada: z.coerce.number().int().min(0).default(0),
   notas_cliente: z.string().trim().nullable().optional(),
+  iva_porcentaje: z.coerce
+    .number()
+    .min(0, "El IVA no puede ser negativo")
+    .max(100, "El IVA no puede superar el 100%")
+    .default(0),
   adelanto: z.coerce.number().min(0).default(0).optional(),
   adelanto_metodo: z
     .enum(["efectivo", "transferencia", "tarjeta_debito", "tarjeta_credito", "cheque"])
@@ -104,6 +109,13 @@ const descuentoOrdenSchema = z.object({
   descuento: z.coerce.number().min(0, "El descuento no puede ser negativo"),
 });
 
+const ivaOrdenSchema = z.object({
+  iva_porcentaje: z.coerce
+    .number()
+    .min(0, "El IVA no puede ser negativo")
+    .max(100, "El IVA no puede superar el 100%"),
+});
+
 const recordatorioServiceSchema = z.object({
   servicio: z.string().trim().min(1, "El servicio es obligatorio").max(120),
   km_base: z.coerce.number().int().min(0, "El kilometraje base no puede ser negativo"),
@@ -155,6 +167,7 @@ module.exports = {
   estadoOrdenSchema,
   notasOrdenSchema,
   descuentoOrdenSchema,
+  ivaOrdenSchema,
   recordatorioServiceSchema,
   updateOrdenSchema,
 };

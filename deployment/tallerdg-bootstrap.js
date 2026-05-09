@@ -48,6 +48,7 @@ const configuracion = [
   ["orden_prefijo", "ORD", "Prefijo numero de orden"],
   ["remito_prefijo", "REM", "Prefijo numero de remito"],
   ["stock_minimo_default", "5", "Stock minimo predeterminado para productos"],
+  ["iva_porcentaje_default", "21", "Porcentaje de IVA sugerido por defecto"],
   ["wsp_activo", "1", "WhatsApp activado (1=si, 0=no)"],
   ["wsp_notificar_orden_cerrada", "1", "Notificar al cliente cuando el trabajo esta listo"],
   ["recordatorio_deuda_dias", "7", "Cada cuantos dias recordar a deudores"],

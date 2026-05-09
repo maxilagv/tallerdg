@@ -29,7 +29,7 @@ async function recalcularTotales(ordenId, trx = db) {
     .where("orden_id", ordenId)
     .sum("subtotal as sum_productos");
 
-  const orden = await trx("ordenes").where({ id: ordenId }).select("descuento").first();
+  const orden = await trx("ordenes").where({ id: ordenId }).select("descuento", "iva_porcentaje").first();
   const [{ total_pagado }] = await trx("pagos")
     .where({ orden_id: ordenId })
     .whereNull("anulado_at")
@@ -37,11 +37,15 @@ async function recalcularTotales(ordenId, trx = db) {
 
   const subtotal = (Number(sum_servicios) || 0) + (Number(sum_productos) || 0);
   const descuento = Number(orden?.descuento) || 0;
-  const total = Math.max(0, subtotal - descuento);
+  const base = Math.max(0, subtotal - descuento);
+  const iva_porcentaje = Number(orden?.iva_porcentaje) || 0;
+  const iva_monto = normalizarImporte(base * (iva_porcentaje / 100));
+  const total = normalizarImporte(base + iva_monto);
   const estado_pago = resolverEstadoPago(total, total_pagado);
 
   await trx("ordenes").where({ id: ordenId }).update({
     subtotal,
+    iva_monto,
     total,
     estado_pago,
     updated_at: trx.fn.now(),

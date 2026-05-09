@@ -113,6 +113,7 @@ export function OrdenDetalle() {
   const [notasMecanico, setNotasMecanico] = useState("");
   const [kmEntrada, setKmEntrada] = useState("0");
   const [descuento, setDescuento] = useState("0");
+  const [ivaPorcentaje, setIvaPorcentaje] = useState("0");
   const [recordatorioServicio, setRecordatorioServicio] = useState("");
   const [recordatorioKmBase, setRecordatorioKmBase] = useState("0");
   const [recordatorioKmProximo, setRecordatorioKmProximo] = useState("");
@@ -155,6 +156,7 @@ export function OrdenDetalle() {
     setNotasMecanico(orden.notas_mecanico || "");
     setKmEntrada(String(orden.km_entrada || 0));
     setDescuento(String(orden.descuento || 0));
+    setIvaPorcentaje(String(orden.iva_porcentaje || 0));
     setRecordatorioServicio(orden.recordatorio_service?.servicio || orden.servicios[0]?.descripcion || "");
     setRecordatorioKmBase(String(orden.recordatorio_service?.km_base ?? orden.km_entrada ?? 0));
     setRecordatorioKmProximo(
@@ -202,6 +204,15 @@ export function OrdenDetalle() {
     mutationFn: () => ordenesApi.aplicarDescuento(Number(id), Number(descuento || 0)),
     onSuccess: async () => {
       add("Descuento actualizado.");
+      await invalidateAll();
+    },
+    onError: (error) => add(getErrorMessage(error), "error"),
+  });
+
+  const ivaMutation = useMutation({
+    mutationFn: () => ordenesApi.aplicarIva(Number(id), Number(ivaPorcentaje || 0)),
+    onSuccess: async () => {
+      add("IVA actualizado.");
       await invalidateAll();
     },
     onError: (error) => add(getErrorMessage(error), "error"),
@@ -730,9 +741,46 @@ export function OrdenDetalle() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between rounded-xl bg-surface-2 px-4 py-3">
-                <span className="font-medium text-text">Total de la orden</span>
-                <span className="text-xl font-bold text-text">{formatMoney(orden.total)}</span>
+              <div className="flex flex-col gap-2">
+                <label className="text-text-muted">IVA (%)</label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={ivaPorcentaje}
+                    onChange={(event: ChangeEvent<HTMLInputElement>) => setIvaPorcentaje(event.target.value)}
+                    onBlur={() => {
+                      const num = Number(ivaPorcentaje);
+                      if (isNaN(num) || num < 0) setIvaPorcentaje("0");
+                      else if (num > 100) setIvaPorcentaje("100");
+                    }}
+                    disabled={!editable}
+                  />
+                  {editable ? (
+                    <Button onClick={() => ivaMutation.mutate()} loading={ivaMutation.isPending}>
+                      Aplicar
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-2 rounded-xl bg-surface-2 px-4 py-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted">Base imponible</span>
+                  <span className="font-medium text-text">
+                    {formatMoney(Math.max(0, Number(orden.subtotal) - Number(orden.descuento || 0)))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-text-muted">IVA</span>
+                  <span className="font-medium text-text">{formatMoney(orden.iva_monto || 0)}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-border/60 pt-2">
+                  <span className="font-medium text-text">Total de la orden</span>
+                  <span className="text-xl font-bold text-text">{formatMoney(orden.total)}</span>
+                </div>
               </div>
 
               {/* Adelanto al ingreso */}

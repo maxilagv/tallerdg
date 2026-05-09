@@ -65,6 +65,8 @@ export interface Orden {
   km_entrada: number;
   subtotal: number;
   descuento: number;
+  iva_porcentaje: number;
+  iva_monto: number;
   adelanto: number;
   adelanto_metodo?: string | null;
   total: number;
@@ -118,6 +120,8 @@ export const ordenesApi = {
     api.put<{ ok: boolean; data: Orden }>(`/ordenes/${id}/estado`, { estado }),
   aplicarDescuento: (id: number, descuento: number) =>
     api.put<{ ok: boolean; data: Orden }>(`/ordenes/${id}/descuento`, { descuento }),
+  aplicarIva: (id: number, iva_porcentaje: number) =>
+    api.put<{ ok: boolean; data: Orden }>(`/ordenes/${id}/iva`, { iva_porcentaje }),
   actualizarRecordatorioService: (
     id: number,
     payload: { servicio: string; km_base: number; km_proximo: number; km_por_dia: number }

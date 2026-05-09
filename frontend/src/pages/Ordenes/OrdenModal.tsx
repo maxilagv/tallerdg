@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { UserPlus } from "lucide-react";
 import { clientesApi } from "../../features/clientes/api";
+import { configuracionApi } from "../../features/configuracion/api";
 import { ordenesApi } from "../../features/ordenes/api";
 import { Button } from "../../shared/ui/Button";
 import { Input } from "../../shared/ui/Input";
@@ -27,6 +28,7 @@ const schema = z.object({
   fecha_ingreso: z.string().min(1, "La fecha es obligatoria"),
   km_entrada: z.string().optional(),
   notas_cliente: z.string().optional(),
+  iva_porcentaje: z.string().optional(),
   adelanto: z.string().optional(),
   adelanto_metodo: z.string().optional(),
 });
@@ -62,13 +64,20 @@ export function OrdenModal({
     staleTime: 1000 * 60 * 5,
   });
 
+  const configuracionQuery = useQuery({
+    queryKey: ["configuracion"],
+    queryFn: () => configuracionApi.obtener(),
+    staleTime: 5 * 60_000,
+    enabled: open,
+  });
+
   const {
     register,
     handleSubmit,
     reset,
     watch,
     setValue,
-    formState: { errors },
+    formState: { errors, dirtyFields },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
@@ -88,10 +97,19 @@ export function OrdenModal({
       fecha_ingreso: new Date().toISOString().slice(0, 10),
       km_entrada: "",
       notas_cliente: "",
+      iva_porcentaje: String(configuracionQuery.data?.data.data.iva_porcentaje_default ?? "0"),
       adelanto: "",
       adelanto_metodo: "efectivo",
     });
   }, [defaultClienteId, defaultVehiculoId, open, reset]);
+
+  useEffect(() => {
+    if (!open || !configuracionQuery.data || dirtyFields.iva_porcentaje) {
+      return;
+    }
+
+    setValue("iva_porcentaje", String(configuracionQuery.data.data.data.iva_porcentaje_default ?? "0"));
+  }, [configuracionQuery.data, dirtyFields.iva_porcentaje, open, setValue]);
 
   const adelantoValue = watch("adelanto");
   const hayAdelanto = Boolean(adelantoValue && Number(adelantoValue) > 0);
@@ -104,6 +122,7 @@ export function OrdenModal({
         fecha_ingreso: values.fecha_ingreso,
         km_entrada: values.km_entrada ? Number(values.km_entrada) : 0,
         notas_cliente: values.notas_cliente || null,
+        iva_porcentaje: values.iva_porcentaje ? Number(values.iva_porcentaje) : 0,
         adelanto: values.adelanto ? Number(values.adelanto) : 0,
         adelanto_metodo: values.adelanto_metodo || null,
       }),
@@ -207,6 +226,16 @@ export function OrdenModal({
             El responsable inicial será el usuario que crea la orden.
           </div>
         </div>
+
+        <Input
+          label="IVA de la orden (%)"
+          type="number"
+          min="0"
+          max="100"
+          step="0.01"
+          hint="Se aplica sobre el subtotal de servicios y productos menos descuentos."
+          {...register("iva_porcentaje")}
+        />
 
         {/* Adelanto */}
         <div className="rounded-xl border border-border bg-surface-2 p-4">
