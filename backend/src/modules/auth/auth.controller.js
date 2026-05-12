@@ -1,7 +1,9 @@
 const AuthService = require("./auth.service");
-const { loginSchema } = require("./auth.validation");
+const { loginSchema, ownerAuthorizationSchema } = require("./auth.validation");
 const AppError = require("../../shared/errors/AppError");
 const config = require("../../config");
+
+const ALLOWED_OWNER_SCOPES = new Set(["cash_manual_movements"]);
 
 const REFRESH_COOKIE = "refreshToken";
 
@@ -65,6 +67,36 @@ const AuthController = {
 
   async me(req, res) {
     return res.json({ ok: true, empleado: req.user });
+  },
+
+  async ownerAuthorization(req, res) {
+    const parsed = ownerAuthorizationSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message || "Datos invalidos.",
+        400,
+        "VALIDATION_ERROR"
+      );
+    }
+
+    const scope = parsed.data.scope || "cash_manual_movements";
+
+    if (!ALLOWED_OWNER_SCOPES.has(scope)) {
+      throw new AppError(
+        "Motivo de autorizacion no permitido.",
+        400,
+        "INVALID_SCOPE"
+      );
+    }
+
+    const result = await AuthService.authorizeOwner(
+      parsed.data.email,
+      parsed.data.password,
+      scope
+    );
+
+    return res.json({ ok: true, ...result });
   },
 };
 

@@ -21,7 +21,19 @@ const roleColors: Record<string, "orange" | "blue" | "green" | "gray"> = {
   recepcionista: "green",
 };
 
-const modulos = ["clientes", "vehiculos", "ordenes", "cobros", "productos", "servicios", "gastos", "finanzas", "empleados", "configuracion"];
+const modulos = [
+  "clientes",
+  "vehiculos",
+  "ordenes",
+  "cobros",
+  "productos",
+  "servicios",
+  "gastos",
+  "finanzas",
+  "empleados",
+  "configuracion",
+  "whatsapp",
+];
 
 const moduloLabels: Record<string, string> = {
   clientes: "Clientes",
@@ -31,8 +43,9 @@ const moduloLabels: Record<string, string> = {
   productos: "Stock",
   servicios: "Servicios",
   gastos: "Gastos",
-  finanzas: "Finanzas",
+  finanzas: "Caja",
   empleados: "Empleados",
+  whatsapp: "WhatsApp",
   configuracion: "Configuración",
 };
 

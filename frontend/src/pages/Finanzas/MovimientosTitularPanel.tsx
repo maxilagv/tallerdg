@@ -11,9 +11,11 @@ import { finanzasApi } from "../../features/finanzas/api";
 import type { MovimientoTitular } from "../../features/finanzas/api";
 import { Button } from "../../shared/ui/Button";
 import { useToast } from "../../shared/ui/Toast";
+import { useAuthStore } from "../../shared/store/authStore";
 import { formatMoney } from "../../shared/utils/format";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { RegistrarMovimientoModal } from "./RegistrarMovimientoModal";
+import { OwnerAuthorizationModal } from "./OwnerAuthorizationModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -36,10 +38,13 @@ interface Props {
 export function MovimientosTitularPanel({ desde, hasta }: Props) {
   const qc      = useQueryClient();
   const { add } = useToast();
+  const empleado = useAuthStore((state) => state.empleado);
+  const esAdmin  = empleado?.permisos?.["*"] === "rw";
 
   const [modalOpen,     setModalOpen]     = useState(false);
   const [editando,      setEditando]      = useState<MovimientoTitular | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<MovimientoTitular | null>(null);
+  const [ownerForDelete, setOwnerForDelete] = useState<MovimientoTitular | null>(null);
   const [limite,        setLimite]        = useState(10);
 
   // Resetear paginación cuando cambia el período
@@ -67,7 +72,8 @@ export function MovimientosTitularPanel({ desde, hasta }: Props) {
   // ── Mutación de eliminación ────────────────────────────────────────────────
 
   const eliminar = useMutation({
-    mutationFn: (id: number) => finanzasApi.eliminarMovimientoTitular(id),
+    mutationFn: (vars: { id: number; ownerToken?: string }) =>
+      finanzasApi.eliminarMovimientoTitular(vars.id, vars.ownerToken),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["finanzas-resumen"] });
       qc.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
@@ -76,9 +82,25 @@ export function MovimientosTitularPanel({ desde, hasta }: Props) {
       qc.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
       add("Movimiento eliminado.", "success");
       setConfirmDelete(null);
+      setOwnerForDelete(null);
     },
     onError: (err) => add(getErrorMessage(err), "error"),
   });
+
+  const confirmarEliminacion = () => {
+    if (!confirmDelete) return;
+    if (esAdmin) {
+      eliminar.mutate({ id: confirmDelete.id });
+      return;
+    }
+    setOwnerForDelete(confirmDelete);
+    setConfirmDelete(null);
+  };
+
+  const handleOwnerAuthorizedDelete = (token: string) => {
+    if (!ownerForDelete) return;
+    eliminar.mutate({ id: ownerForDelete.id, ownerToken: token });
+  };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -257,6 +279,15 @@ export function MovimientosTitularPanel({ desde, hasta }: Props) {
         movimiento={editando}
       />
 
+      {/* ── Autorizacion del dueño para eliminar ───────────────────────────── */}
+      <OwnerAuthorizationModal
+        open={!!ownerForDelete}
+        scope="cash_manual_movements"
+        description="Para eliminar un movimiento manual de caja necesitamos el visto bueno del dueño o un administrador."
+        onClose={() => setOwnerForDelete(null)}
+        onAuthorized={handleOwnerAuthorizedDelete}
+      />
+
       {/* ── Confirm de eliminación (inline overlay) ────────────────────────── */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -283,9 +314,9 @@ export function MovimientosTitularPanel({ desde, hasta }: Props) {
                 variant="danger"
                 size="sm"
                 loading={eliminar.isPending}
-                onClick={() => eliminar.mutate(confirmDelete.id)}
+                onClick={confirmarEliminacion}
               >
-                Eliminar
+                {esAdmin ? "Eliminar" : "Pedir autorizacion"}
               </Button>
             </div>
           </div>

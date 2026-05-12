@@ -1,7 +1,11 @@
 const { Router } = require("express");
 const FinanzasController = require("./finanzas.controller");
 const authMiddleware = require("../../shared/middleware/auth.middleware");
-const { requirePermiso } = require("../../shared/middleware/roles.middleware");
+const {
+  requirePermiso,
+  requireAdmin,
+  requireOwnerAuthorization,
+} = require("../../shared/middleware/roles.middleware");
 
 const router = Router();
 router.use(authMiddleware);
@@ -18,14 +22,18 @@ router.get("/movimientos-mes",      requirePermiso("finanzas", "r"), FinanzasCon
 router.get("/analisis",             requirePermiso("finanzas", "r"), FinanzasController.analisis);
 
 // ── Reset de caja (un solo uso) ───────────────────────────────────────────────
+// El estado se ve con permiso de lectura. El reset queda reservado al dueño/admin.
 router.get("/reset-caja",            requirePermiso("finanzas", "r"), FinanzasController.estadoResetCaja);
-router.post("/reset-caja",           requirePermiso("finanzas", "w"), FinanzasController.resetCaja);
+router.post("/reset-caja",           requireAdmin,                    FinanzasController.resetCaja);
 
 // ── Movimientos del Titular (CRUD) ────────────────────────────────────────────
-router.get("/movimientos-titular",        requirePermiso("finanzas", "r"), FinanzasController.listarMovimientosTitular);
-router.post("/movimientos-titular",       requirePermiso("finanzas", "w"), FinanzasController.crearMovimientoTitular);
-router.put("/movimientos-titular/:id",    requirePermiso("finanzas", "w"), FinanzasController.actualizarMovimientoTitular);
-router.delete("/movimientos-titular/:id", requirePermiso("finanzas", "w"), FinanzasController.eliminarMovimientoTitular);
+// Lectura: cualquier rol que pueda ver finanzas.
+// Escritura: admin sin override; recepcionista solo con X-Owner-Authorization
+// emitido por el endpoint POST /api/auth/owner-authorization.
+router.get("/movimientos-titular",        requirePermiso("finanzas", "r"),                       FinanzasController.listarMovimientosTitular);
+router.post("/movimientos-titular",       requireOwnerAuthorization("cash_manual_movements"),    FinanzasController.crearMovimientoTitular);
+router.put("/movimientos-titular/:id",    requireOwnerAuthorization("cash_manual_movements"),    FinanzasController.actualizarMovimientoTitular);
+router.delete("/movimientos-titular/:id", requireOwnerAuthorization("cash_manual_movements"),    FinanzasController.eliminarMovimientoTitular);
 
 // ── Export Excel ──────────────────────────────────────────────────────────────
 router.get("/exportar",             requirePermiso("finanzas", "r"), FinanzasController.exportarExcel);

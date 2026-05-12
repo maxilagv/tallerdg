@@ -5,7 +5,9 @@ import { finanzasApi, type MovimientoTitularPayload, type TipoMovimientoTitular 
 import { Modal } from "../../shared/ui/Modal";
 import { Button } from "../../shared/ui/Button";
 import { useToast } from "../../shared/ui/Toast";
+import { useAuthStore } from "../../shared/store/authStore";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
+import { OwnerAuthorizationModal } from "./OwnerAuthorizationModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -63,6 +65,8 @@ interface Props {
 export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
   const qc     = useQueryClient();
   const { add } = useToast();
+  const empleado = useAuthStore((state) => state.empleado);
+  const esAdmin  = empleado?.permisos?.["*"] === "rw";
   const esEdicion = !!movimiento;
 
   const [tipo,       setTipo]       = useState<TipoMovimientoTitular>(movimiento?.tipo ?? "aporte_titular");
@@ -78,10 +82,16 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
   // Conceptos sugeridos del historial local
   const [sugeridos, setSugeridos] = useState<string[]>([]);
 
+  // Autorizacion del dueño (solo si el usuario no es admin)
+  const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<MovimientoTitularPayload | null>(null);
+
   useEffect(() => {
     if (open) {
       setSugeridos(getConceptosSugeridos());
       setShowDetails(!!(movimiento?.referencia || movimiento?.notas));
+      setOwnerModalOpen(false);
+      setPendingPayload(null);
     }
   }, [open, movimiento]);
 
@@ -94,15 +104,16 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
   };
 
   const crear = useMutation({
-    mutationFn: (payload: MovimientoTitularPayload) => finanzasApi.crearMovimientoTitular(payload),
-    onSuccess: () => { invalidar(); add("Movimiento registrado.", "success"); onClose(); },
+    mutationFn: (vars: { payload: MovimientoTitularPayload; ownerToken?: string }) =>
+      finanzasApi.crearMovimientoTitular(vars.payload, vars.ownerToken),
+    onSuccess: () => { invalidar(); add("Movimiento registrado.", "success"); setPendingPayload(null); onClose(); },
     onError:   (err) => add(getErrorMessage(err), "error"),
   });
 
   const editar = useMutation({
-    mutationFn: (payload: Partial<MovimientoTitularPayload>) =>
-      finanzasApi.actualizarMovimientoTitular(movimiento!.id, payload),
-    onSuccess: () => { invalidar(); add("Movimiento actualizado.", "success"); onClose(); },
+    mutationFn: (vars: { payload: Partial<MovimientoTitularPayload>; ownerToken?: string }) =>
+      finanzasApi.actualizarMovimientoTitular(movimiento!.id, vars.payload, vars.ownerToken),
+    onSuccess: () => { invalidar(); add("Movimiento actualizado.", "success"); setPendingPayload(null); onClose(); },
     onError:   (err) => add(getErrorMessage(err), "error"),
   });
 
@@ -125,149 +136,189 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
 
     guardarConcepto(concepto.trim());
 
-    if (esEdicion) editar.mutate(payload);
-    else           crear.mutate(payload);
+    if (esAdmin) {
+      if (esEdicion) editar.mutate({ payload });
+      else           crear.mutate({ payload });
+      return;
+    }
+
+    setPendingPayload(payload);
+    setOwnerModalOpen(true);
+  };
+
+  const handleAuthorized = (token: string) => {
+    setOwnerModalOpen(false);
+    if (!pendingPayload) return;
+    if (esEdicion) editar.mutate({ payload: pendingPayload, ownerToken: token });
+    else           crear.mutate({ payload: pendingPayload, ownerToken: token });
   };
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={esEdicion ? "Editar movimiento" : "Registrar movimiento de caja"}
-      size="md"
-    >
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Selector de tipo */}
-        {!esEdicion && (
-          <div>
-            <label className="mb-2 block text-xs font-medium text-text-muted">Tipo de movimiento</label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {TIPOS.map(({ value, label, Icon, sub, bg }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setTipo(value)}
-                  className={`rounded-xl border p-3 text-left transition ${tipo === value ? bg : "border-border bg-surface-2 hover:bg-surface-3"}`}
-                >
-                  <div className="mb-1 flex items-center gap-2">
-                    <Icon size={14} className={tipo === value ? "text-violet-300" : "text-text-muted"} />
-                    <span className={`text-sm font-semibold ${tipo === value ? "text-violet-200" : "text-text"}`}>{label}</span>
-                  </div>
-                  <p className="text-xs text-text-muted leading-snug">{sub}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Monto */}
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-text-muted">Monto *</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            placeholder="Ej: 50000"
-            className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
-            required
-          />
-        </div>
-
-        {/* Concepto */}
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-text-muted">
-            Concepto * <span className="text-text-muted/60">(¿para qué fue?)</span>
-          </label>
-          {/* Chips de conceptos frecuentes */}
-          {sugeridos.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {sugeridos.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setConcepto(s)}
-                  className="rounded-lg border border-border bg-surface-3 px-2.5 py-1 text-xs text-text-muted transition hover:border-primary/50 hover:text-text"
-                >
-                  {s}
-                </button>
-              ))}
+    <>
+      <Modal
+        open={open}
+        onClose={onClose}
+        title={esEdicion ? "Editar movimiento" : "Registrar movimiento de caja"}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {!esAdmin && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
+              <p className="text-xs text-amber-200">
+                Como no sos admin, vamos a pedir la autorizacion del dueño antes de confirmar.
+              </p>
             </div>
           )}
-          <input
-            type="text"
-            value={concepto}
-            onChange={(e) => setConcepto(e.target.value)}
-            placeholder='Ej: "Pago de alquiler de mi cuenta" · "Retiro para uso personal"'
-            maxLength={255}
-            className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
-            required
-          />
-        </div>
 
-        {/* Fecha */}
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-text-muted">Fecha *</label>
-          <input
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
-            required
-          />
-        </div>
-
-        {/* Toggle detalles opcionales */}
-        <button
-          type="button"
-          onClick={() => setShowDetails((v) => !v)}
-          className="flex items-center gap-1 text-xs text-text-muted transition hover:text-text"
-        >
-          {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          {showDetails ? "Ocultar detalles" : "Agregar detalles (referencia, notas)"}
-        </button>
-
-        {/* Campos opcionales */}
-        {showDetails && (
-          <div className="space-y-4">
+          {/* Selector de tipo */}
+          {!esEdicion && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-text-muted">
-                Referencia <span className="text-text-muted/60">(opcional)</span>
-              </label>
-              <input
-                type="text"
-                value={referencia}
-                onChange={(e) => setReferencia(e.target.value)}
-                placeholder="Nro. de transferencia, recibo..."
-                maxLength={255}
-                className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
-              />
+              <label className="mb-2 block text-xs font-medium text-text-muted">Tipo de movimiento</label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {TIPOS.map(({ value, label, Icon, sub, bg }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTipo(value)}
+                    className={`rounded-xl border p-3 text-left transition ${tipo === value ? bg : "border-border bg-surface-2 hover:bg-surface-3"}`}
+                  >
+                    <div className="mb-1 flex items-center gap-2">
+                      <Icon size={14} className={tipo === value ? "text-violet-300" : "text-text-muted"} />
+                      <span className={`text-sm font-semibold ${tipo === value ? "text-violet-200" : "text-text"}`}>{label}</span>
+                    </div>
+                    <p className="text-xs text-text-muted leading-snug">{sub}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-text-muted">
-                Notas <span className="text-text-muted/60">(opcional)</span>
-              </label>
-              <textarea
-                value={notas}
-                onChange={(e) => setNotas(e.target.value)}
-                placeholder="Cualquier detalle adicional..."
-                rows={2}
-                maxLength={2000}
-                className="w-full resize-none rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
-              />
-            </div>
+          )}
+
+          {/* Monto */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted">Monto *</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={monto}
+              onChange={(e) => setMonto(e.target.value)}
+              placeholder="Ej: 50000"
+              className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+              required
+            />
           </div>
-        )}
 
-        {/* Acciones */}
-        <div className="flex justify-end gap-3 pt-1">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>Cancelar</Button>
-          <Button type="submit" loading={isLoading} disabled={isLoading}>
-            {esEdicion ? "Guardar cambios" : "Registrar"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+          {/* Concepto */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted">
+              Concepto * <span className="text-text-muted/60">(¿para qué fue?)</span>
+            </label>
+            {/* Chips de conceptos frecuentes */}
+            {sugeridos.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {sugeridos.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setConcepto(s)}
+                    className="rounded-lg border border-border bg-surface-3 px-2.5 py-1 text-xs text-text-muted transition hover:border-primary/50 hover:text-text"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            <input
+              type="text"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+              placeholder='Ej: "Pago de alquiler de mi cuenta" · "Retiro para uso personal"'
+              maxLength={255}
+              className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+              required
+            />
+          </div>
+
+          {/* Fecha */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted">Fecha *</label>
+            <input
+              type="date"
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+              required
+            />
+          </div>
+
+          {/* Toggle detalles opcionales */}
+          <button
+            type="button"
+            onClick={() => setShowDetails((v) => !v)}
+            className="flex items-center gap-1 text-xs text-text-muted transition hover:text-text"
+          >
+            {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            {showDetails ? "Ocultar detalles" : "Agregar detalles (referencia, notas)"}
+          </button>
+
+          {/* Campos opcionales */}
+          {showDetails && (
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-text-muted">
+                  Referencia <span className="text-text-muted/60">(opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={referencia}
+                  onChange={(e) => setReferencia(e.target.value)}
+                  placeholder="Nro. de transferencia, recibo..."
+                  maxLength={255}
+                  className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-text-muted">
+                  Notas <span className="text-text-muted/60">(opcional)</span>
+                </label>
+                <textarea
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  placeholder="Cualquier detalle adicional..."
+                  rows={2}
+                  maxLength={2000}
+                  className="w-full resize-none rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Acciones */}
+          <div className="flex justify-end gap-3 pt-1">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>Cancelar</Button>
+            <Button type="submit" loading={isLoading} disabled={isLoading}>
+              {esEdicion
+                ? esAdmin ? "Guardar cambios" : "Pedir autorizacion"
+                : esAdmin ? "Registrar" : "Pedir autorizacion"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <OwnerAuthorizationModal
+        open={ownerModalOpen}
+        scope="cash_manual_movements"
+        description={
+          esEdicion
+            ? "Para modificar este movimiento manual de caja necesitamos el visto bueno del dueño o un administrador."
+            : "Para registrar un movimiento manual de caja necesitamos el visto bueno del dueño o un administrador."
+        }
+        onClose={() => {
+          setOwnerModalOpen(false);
+          setPendingPayload(null);
+        }}
+        onAuthorized={handleAuthorized}
+      />
+    </>
   );
 }

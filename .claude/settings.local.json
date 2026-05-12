@@ -23,7 +23,8 @@
       "Bash(node -e \":*)",
       "Bash(node -e \"require\\(''exceljs''\\); console.log\\(''ExcelJS OK''\\)\")",
       "Bash(node -e \"const knex = require\\('./src/shared/db/knex'\\); knex.migrate.latest\\(\\).then\\(\\([batch, files]\\) => { console.log\\('Migradas:', files\\); process.exit\\(0\\); }\\).catch\\(e => { console.error\\(e.message\\); process.exit\\(1\\); }\\);\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(node src/scripts/check-permisos-recepcionista.js)"
     ]
   }
 }

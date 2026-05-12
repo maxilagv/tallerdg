@@ -32,8 +32,15 @@ const roles = [
     permisos: JSON.stringify({
       clientes: "rw",
       vehiculos: "rw",
-      ordenes: "r",
+      ordenes: "rw",
       cobros: "rw",
+      productos: "rw",
+      servicios: "rw",
+      gastos: "rw",
+      finanzas: "rw",
+      empleados: "rw",
+      configuracion: "rw",
+      whatsapp: "rw",
     }),
   },
 ];

@@ -17,6 +17,7 @@ const modulos = [
   "finanzas",
   "empleados",
   "configuracion",
+  "whatsapp",
 ];
 
 const moduloLabels: Record<string, string> = {
@@ -29,6 +30,7 @@ const moduloLabels: Record<string, string> = {
   gastos:       "Gastos",
   finanzas:     "Caja",
   empleados:    "Empleados",
+  whatsapp:     "WhatsApp",
   configuracion:"Configuración",
 };
 

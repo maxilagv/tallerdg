@@ -224,14 +224,40 @@ export const finanzasApi = {
   movimientosTitular: (params?: { desde?: string; hasta?: string; page?: number; limit?: number }) =>
     api.get<{ ok: boolean; data: { rows: MovimientoTitular[]; total: number; page: number; limit: number } }>("/finanzas/movimientos-titular", { params }),
 
-  crearMovimientoTitular: (payload: MovimientoTitularPayload) =>
-    api.post<{ ok: boolean; data: MovimientoTitular }>("/finanzas/movimientos-titular", payload),
+  crearMovimientoTitular: (
+    payload: MovimientoTitularPayload,
+    ownerAuthorizationToken?: string | null
+  ) =>
+    api.post<{ ok: boolean; data: MovimientoTitular }>(
+      "/finanzas/movimientos-titular",
+      payload,
+      ownerAuthorizationToken
+        ? { headers: { "X-Owner-Authorization": ownerAuthorizationToken } }
+        : undefined
+    ),
 
-  actualizarMovimientoTitular: (id: number, payload: Partial<MovimientoTitularPayload>) =>
-    api.put<{ ok: boolean; data: MovimientoTitular }>(`/finanzas/movimientos-titular/${id}`, payload),
+  actualizarMovimientoTitular: (
+    id: number,
+    payload: Partial<MovimientoTitularPayload>,
+    ownerAuthorizationToken?: string | null
+  ) =>
+    api.put<{ ok: boolean; data: MovimientoTitular }>(
+      `/finanzas/movimientos-titular/${id}`,
+      payload,
+      ownerAuthorizationToken
+        ? { headers: { "X-Owner-Authorization": ownerAuthorizationToken } }
+        : undefined
+    ),
 
-  eliminarMovimientoTitular: (id: number) =>
-    api.delete<{ ok: boolean }>(`/finanzas/movimientos-titular/${id}`),
+  eliminarMovimientoTitular: (
+    id: number,
+    ownerAuthorizationToken?: string | null
+  ) =>
+    api.delete<{ ok: boolean }>(`/finanzas/movimientos-titular/${id}`, {
+      headers: ownerAuthorizationToken
+        ? { "X-Owner-Authorization": ownerAuthorizationToken }
+        : undefined,
+    }),
 
   // Export Excel
   exportarExcel: async (params: { desde: string; hasta: string; caja_inicia_en_cero?: boolean }) => {

@@ -82,7 +82,7 @@ const navSections: NavSection[] = [
       { to: "/servicios",    label: "Servicios",      icon: Wrench,          modulo: "servicios" },
       { to: "/empleados",    label: "Empleados",      icon: BriefcaseBusiness, modulo: "empleados" },
       { to: "/ofertas",      label: "Ofertas",        icon: Megaphone,       modulo: "configuracion" },
-      { to: "/whatsapp",     label: "WhatsApp",       icon: MessageCircleMore, modulo: "configuracion" },
+      { to: "/whatsapp",     label: "WhatsApp",       icon: MessageCircleMore, modulo: "whatsapp" },
       { to: "/configuracion",label: "Ajustes",        icon: Settings,        modulo: "configuracion" },
     ],
   },

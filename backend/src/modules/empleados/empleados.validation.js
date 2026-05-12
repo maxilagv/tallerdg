@@ -1,6 +1,19 @@
 const { z } = require("zod");
 
 const permisoValorSchema = z.enum(["r", "rw", "none"]);
+const allowedPermissionModules = new Set([
+  "clientes",
+  "vehiculos",
+  "ordenes",
+  "cobros",
+  "productos",
+  "servicios",
+  "gastos",
+  "finanzas",
+  "empleados",
+  "configuracion",
+  "whatsapp",
+]);
 
 const createEmpleadoSchema = z.object({
   rol_id: z.coerce.number().int().positive("El rol es obligatorio"),
@@ -33,6 +46,16 @@ const changePasswordSchema = z.object({
 const rolePermissionsSchema = z.object({
   nombre: z.string().trim().min(1).max(50).optional(),
   permisos: z.record(z.string(), permisoValorSchema),
+}).superRefine((data, ctx) => {
+  for (const modulo of Object.keys(data.permisos || {})) {
+    if (!allowedPermissionModules.has(modulo)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["permisos", modulo],
+        message: "Modulo de permiso no permitido.",
+      });
+    }
+  }
 });
 
 module.exports = {

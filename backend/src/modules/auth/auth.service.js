@@ -123,6 +123,63 @@ const AuthService = {
       await AuthRepository.revokeRefreshToken(token);
     }
   },
+
+  // ── Autorizacion del dueño/admin para acciones sensibles ────────────────
+  // Valida credenciales de un empleado admin activo y emite un token corto
+  // con scope acotado (p.ej. "cash_manual_movements") para autorizar la
+  // siguiente accion sensible. No reemplaza la sesion principal del usuario.
+  async authorizeOwner(email, password, scope = "cash_manual_movements") {
+    const empleado = await AuthRepository.findByEmail(email);
+
+    if (!empleado) {
+      throw new AppError(
+        "Credenciales del dueño/admin invalidas.",
+        401,
+        "OWNER_AUTHORIZATION_FAILED"
+      );
+    }
+
+    const permisos = parsePermisos(empleado.permisos);
+    if (permisos?.["*"] !== "rw") {
+      throw new AppError(
+        "Ese usuario no es dueño ni administrador.",
+        403,
+        "OWNER_AUTHORIZATION_FAILED"
+      );
+    }
+
+    const isValid = await bcrypt.compare(password, empleado.password_hash);
+    if (!isValid) {
+      throw new AppError(
+        "Credenciales del dueño/admin invalidas.",
+        401,
+        "OWNER_AUTHORIZATION_FAILED"
+      );
+    }
+
+    const expiresInSeconds = 5 * 60; // 5 minutos
+    const token = jwt.sign(
+      {
+        kind: "owner_authorization",
+        ownerEmpleadoId: empleado.id,
+        scopes: [scope],
+      },
+      config.jwtSecret,
+      { expiresIn: expiresInSeconds }
+    );
+
+    return {
+      token,
+      expiresIn: expiresInSeconds,
+      scope,
+      owner: {
+        id: empleado.id,
+        nombre: empleado.nombre,
+        apellido: empleado.apellido,
+        email: empleado.email,
+      },
+    };
+  },
 };
 
 module.exports = AuthService;
