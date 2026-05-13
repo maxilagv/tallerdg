@@ -17,6 +17,11 @@ function getCookieOptions() {
   };
 }
 
+function getClearCookieOptions() {
+  const { maxAge, ...options } = getCookieOptions();
+  return options;
+}
+
 const AuthController = {
   async login(req, res) {
     const parsed = loginSchema.safeParse(req.body);
@@ -47,7 +52,14 @@ const AuthController = {
       throw new AppError("No hay sesion activa.", 401, "NO_REFRESH");
     }
 
-    const result = await AuthService.refresh(token);
+    let result;
+
+    try {
+      result = await AuthService.refresh(token);
+    } catch (error) {
+      res.clearCookie(REFRESH_COOKIE, getClearCookieOptions());
+      throw error;
+    }
 
     res.cookie(REFRESH_COOKIE, result.refreshToken, getCookieOptions());
 
@@ -61,7 +73,7 @@ const AuthController = {
   async logout(req, res) {
     const token = req.cookies?.[REFRESH_COOKIE];
     await AuthService.logout(token);
-    res.clearCookie(REFRESH_COOKIE, getCookieOptions());
+    res.clearCookie(REFRESH_COOKIE, getClearCookieOptions());
     return res.json({ ok: true, message: "Sesion cerrada." });
   },
 

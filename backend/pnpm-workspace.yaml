@@ -1,0 +1,5 @@
+allowBuilds:
+  # puppeteer downloads Chromium binary — required by whatsapp-web.js
+  puppeteer: true
+  # native C extension for msgpackr serialization
+  msgpackr-extract: true

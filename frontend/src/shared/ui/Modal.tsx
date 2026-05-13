@@ -41,16 +41,16 @@ export function Modal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-0 md:items-center md:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative z-10 w-full rounded-2xl border border-border bg-surface ${sizes[size]}`}>
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <div className={`relative z-10 flex w-full max-h-[90dvh] flex-col rounded-t-2xl border border-border bg-surface md:rounded-2xl ${sizes[size]}`}>
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <h2 className="text-base font-semibold text-text">{title}</h2>
           <button onClick={onClose} className="text-text-muted transition hover:text-text">
             <X size={18} />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );

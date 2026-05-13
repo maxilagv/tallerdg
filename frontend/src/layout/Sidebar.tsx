@@ -91,7 +91,7 @@ const navSections: NavSection[] = [
 // Todos los ítems aplanados para el modo colapsado (sin sección)
 const allItems: NavItem[] = navSections.flatMap((s) => s.items);
 
-export function Sidebar() {
+export function Sidebar({ mobileOpen, onMobileClose }: { mobileOpen: boolean; onMobileClose: () => void }) {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const empleado = useAuthStore((state) => state.empleado);
@@ -130,6 +130,7 @@ export function Sidebar() {
       <NavLink
         key={item.to}
         to={item.to}
+        onClick={onMobileClose}
         className={({ isActive }) =>
           clsx(
             "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition",
@@ -158,10 +159,23 @@ export function Sidebar() {
   };
 
   return (
+    <>
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={onMobileClose}
+        />
+      )}
     <aside
       className={clsx(
         "flex h-screen flex-col border-r border-border bg-surface/95 transition-all duration-300",
-        collapsed ? "w-18" : "w-64"
+        // Mobile: fixed overlay always w-64
+        "fixed inset-y-0 left-0 z-40 w-64",
+        // Desktop: back in normal flow
+        "md:static md:z-auto",
+        collapsed ? "md:w-18" : "md:w-64",
+        // Mobile open/close via translate, desktop always visible
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
       )}
     >
       {/* Cabecera */}
@@ -227,5 +241,6 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
+    </>
   );
 }
