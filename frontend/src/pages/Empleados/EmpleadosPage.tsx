@@ -152,7 +152,43 @@ export function EmpleadosPage() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Vista mobile: tarjetas */}
+              <div className="divide-y divide-border/60 md:hidden">
+                {empleados.map((empleado) => (
+                  <div key={empleado.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-text">{empleado.nombre} {empleado.apellido}</div>
+                        <div className="mt-0.5 text-xs text-text-muted">{empleado.email}</div>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <Badge variant={roleColors[empleado.rol_nombre] || "gray"}>{empleado.rol_nombre}</Badge>
+                          <Badge variant={Boolean(empleado.activo) ? "green" : "red"}>
+                            {Boolean(empleado.activo) ? "Activo" : "Inactivo"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => { setEditing(empleado); setModalOpen(true); }}>
+                          <Edit size={15} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          const role = roles.find((item) => item.id === empleado.rol_id) || null;
+                          setRoleEditing(role);
+                          setRolesOpen(true);
+                        }}>
+                          <Settings2 size={15} />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEliminar(empleado)}>
+                          <Trash2 size={15} className="text-red-300" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vista desktop: tabla completa */}
+              <div className="hidden overflow-x-auto md:block">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

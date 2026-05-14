@@ -93,7 +93,61 @@ export function ComprasPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas expandibles */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {compras.map((c) => (
+                <div key={c.id}>
+                  <button
+                    onClick={() => toggleExpand(c.id)}
+                    className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition active:bg-surface-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-text">
+                        {c.proveedor_nombre || c.origen_nombre || <span className="text-text-muted text-xs">Compra directa</span>}
+                        {!c.actualiza_stock && (
+                          <span className="ml-2 rounded-lg bg-surface-3 px-2 py-0.5 text-xs text-text-muted">sin stock</span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 text-xs text-text-muted">{formatDate(c.fecha)}</div>
+                      {c.notas && <div className="mt-0.5 truncate text-xs text-text-muted">{c.notas}</div>}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-semibold text-green-300">{formatMoney(c.total)}</span>
+                      {expandedId === c.id ? <ChevronUp size={16} className="text-text-muted" /> : <ChevronDown size={16} className="text-text-muted" />}
+                    </div>
+                  </button>
+                  {expandedId === c.id && (
+                    <div className="border-t border-border/40 bg-surface-2 px-4 py-3">
+                      {detailQuery.isLoading ? (
+                        <p className="text-xs text-text-muted">Cargando detalle...</p>
+                      ) : detalle?.items?.length ? (
+                        <div className="space-y-2">
+                          {detalle.items.map((item) => (
+                            <div key={item.id} className="flex items-start justify-between gap-2 text-sm">
+                              <div className="flex items-center gap-2 text-text">
+                                <Package size={13} className="shrink-0 text-text-muted" />
+                                <span>{item.producto_nombre || item.descripcion || "Item libre"}</span>
+                              </div>
+                              <span className="shrink-0 font-semibold text-text">{formatMoney(item.subtotal)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-text-muted">Sin detalle disponible.</p>
+                      )}
+                      <div className="mt-3 flex justify-end">
+                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEliminar(c); }}>
+                          <Trash2 size={14} className="text-red-300" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

@@ -140,7 +140,48 @@ export function OrdenesPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas tapeables */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {ordenes.map((orden) => {
+                const esDeuda = orden.estado === "cerrada" && Number(orden.saldo_pendiente) > 0;
+                return (
+                  <button
+                    key={orden.id}
+                    onClick={() => navigate(`/ordenes/${orden.id}`)}
+                    className={`w-full px-4 py-3 text-left transition active:bg-surface-2 ${
+                      esDeuda ? "bg-red-500/[0.04]" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-mono font-semibold text-primary">{orden.numero}</span>
+                      <Badge variant={estadoMeta[orden.estado].variant}>{estadoMeta[orden.estado].label}</Badge>
+                    </div>
+                    <div className="mt-1 font-medium text-text">
+                      {orden.cliente_apellido}, {orden.cliente_nombre}
+                    </div>
+                    <div className="text-xs text-text-muted">
+                      {orden.patente} · {orden.marca} {orden.modelo}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={estadoPagoMeta[orden.estado_pago].variant}>
+                          {estadoPagoMeta[orden.estado_pago].label}
+                        </Badge>
+                        {esDeuda && (
+                          <span className="text-xs font-semibold text-red-400">
+                            Deuda {formatMoney(orden.saldo_pendiente)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-semibold text-text">{formatMoney(orden.total)}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

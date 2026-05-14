@@ -125,7 +125,43 @@ export function ProveedoresPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {proveedores.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                  <button
+                    onClick={() => navigate(`/proveedores/${p.id}`)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="font-medium text-text">{p.nombre}</div>
+                    {p.cuit && <div className="text-xs text-text-muted">CUIT: {p.cuit}</div>}
+                    <div className="text-xs text-text-muted">{p.telefono || p.email || "Sin contacto"}</div>
+                    {p.tiene_cc && (
+                      <div className="mt-1.5">
+                        <Badge variant={Number(p.saldo_cc) > 0 ? "red" : Number(p.saldo_cc) < 0 ? "yellow" : "green"}>
+                          {Number(p.saldo_cc) > 0
+                            ? `Debe ${formatMoney(p.saldo_cc ?? 0)}`
+                            : Number(p.saldo_cc) < 0
+                              ? `A favor ${formatMoney(Math.abs(Number(p.saldo_cc ?? 0)))}`
+                              : "Al dia"}
+                        </Badge>
+                      </div>
+                    )}
+                  </button>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="sm" onClick={(e) => openEdit(e, p)}>
+                      <Pencil size={15} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={(e) => handleEliminar(e, p)}>
+                      <Trash2 size={15} className="text-red-300" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

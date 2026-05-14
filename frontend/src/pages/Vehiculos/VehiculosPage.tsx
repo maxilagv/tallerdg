@@ -134,7 +134,37 @@ export function VehiculosPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {vehiculos.map((vehiculo) => (
+                <div key={vehiculo.id} className="flex items-center gap-3 px-4 py-3">
+                  <button
+                    onClick={() => navigate(`/vehiculos/${vehiculo.id}`)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <div className="font-mono font-bold text-accent">{vehiculo.patente}</div>
+                    <div className="mt-0.5 text-sm text-text">{vehiculo.marca} {vehiculo.modelo}</div>
+                    <div className="mt-0.5 text-xs text-text-muted">
+                      {vehiculo.cliente_apellido}, {vehiculo.cliente_nombre} · {vehiculo.anio || "-"}
+                    </div>
+                    <div className="mt-1.5">
+                      <Badge variant="gray">{vehiculo.tipo_combustible}</Badge>
+                    </div>
+                  </button>
+                  <div className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => { setEditing(vehiculo); setModalOpen(true); }}>
+                      <Pencil size={15} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleEliminar(vehiculo)}>
+                      <Trash2 size={15} className="text-red-300" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

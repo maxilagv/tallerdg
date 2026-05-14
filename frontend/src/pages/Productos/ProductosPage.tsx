@@ -246,7 +246,44 @@ export function ProductosPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {productos.map((producto) => (
+                <div key={producto.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-text">{producto.nombre}</div>
+                      <div className="text-xs text-text-muted">
+                        {producto.codigo || "Sin código"} · {producto.marca || "Sin marca"}
+                      </div>
+                    </div>
+                    <span className="shrink-0 font-semibold text-text">{formatMoney(producto.precio_venta)}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <StockBadge actual={producto.stock_actual} minimo={producto.stock_minimo} />
+                      <span className="text-xs text-text-muted">
+                        {Number(producto.stock_actual).toLocaleString("es-AR")} {producto.unidad}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => { setEditing(producto); setModalOpen(true); }}>
+                        <Pencil size={15} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setAdjusting(producto); setAjusteOpen(true); }}>
+                        Ajustar
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEliminar(producto)}>
+                        <Trash2 size={15} className="text-red-300" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

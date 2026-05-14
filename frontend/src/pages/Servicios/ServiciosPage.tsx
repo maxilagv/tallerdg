@@ -153,7 +153,36 @@ export function ServiciosPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {servicios.map((servicio) => (
+                <div key={servicio.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-text">{servicio.nombre}</div>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <Badge variant="blue">{servicio.categoria_nombre}</Badge>
+                        {servicio.tiempo_estimado_min && (
+                          <span className="text-xs text-text-muted">{servicio.tiempo_estimado_min} min</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-semibold text-text">{formatMoney(servicio.precio_base)}</span>
+                      <Button variant="ghost" size="sm" onClick={() => { setEditing(servicio); setModalOpen(true); }}>
+                        <Pencil size={15} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEliminar(servicio)}>
+                        <Trash2 size={15} className="text-red-300" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

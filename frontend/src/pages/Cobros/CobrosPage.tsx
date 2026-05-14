@@ -260,7 +260,43 @@ export function CobrosPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {cobros.map((pago) => (
+                <div key={pago.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <Link to={`/ordenes/${pago.orden_id}`} className="font-mono font-semibold text-primary">
+                        {pago.orden_numero}
+                      </Link>
+                      <span className="ml-2 text-xs text-text-muted">{pago.patente}</span>
+                    </div>
+                    <Badge variant={estadoCobroMeta[pago.estado].variant}>{estadoCobroMeta[pago.estado].label}</Badge>
+                  </div>
+                  <div className="mt-0.5 text-sm font-medium text-text">
+                    {pago.cliente_apellido}, {pago.cliente_nombre}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="text-xs text-text-muted">
+                      {formatDate(pago.created_at)} · {metodoPagoLabels[pago.metodo]}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-semibold ${pago.estado === "anulado" ? "text-text-muted line-through" : "text-green-300"}`}>
+                        {formatMoney(pago.monto)}
+                      </span>
+                      {canEditCobros && pago.estado === "activo" ? (
+                        <Button variant="ghost" size="sm" onClick={() => setPagoSeleccionado(pago)}>
+                          <Ban size={14} />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">

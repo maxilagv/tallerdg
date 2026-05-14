@@ -169,7 +169,36 @@ export function GastosPage() {
           />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Vista mobile: tarjetas */}
+            <div className="divide-y divide-border/60 md:hidden">
+              {gastos.map((gasto) => (
+                <div key={gasto.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium text-text">{gasto.descripcion}</div>
+                      <div className="mt-0.5 text-xs text-text-muted">
+                        {gasto.categoria_nombre} · {formatDate(gasto.fecha)}
+                      </div>
+                      {gasto.metodo_pago && (
+                        <div className="mt-0.5 text-xs text-text-muted">{metodoPagoLabels[gasto.metodo_pago]}</div>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-semibold text-red-300">{formatMoney(gasto.monto)}</span>
+                      <Button variant="ghost" size="sm" onClick={() => { setEditing(gasto); setModalOpen(true); }}>
+                        <Edit size={15} />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEliminar(gasto)}>
+                        <Trash2 size={15} className="text-red-300" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla completa */}
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase text-text-muted">
