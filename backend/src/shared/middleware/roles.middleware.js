@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const config = require("../../config");
 const AppError = require("../errors/AppError");
+const AuthRepository = require("../../modules/auth/auth.repository");
 
 function isAdmin(user) {
   return user?.permisos?.["*"] === "rw";
@@ -57,7 +58,7 @@ function requireAdmin(req, res, next) {
 // autorizacion del dueño/admin (X-Owner-Authorization) cuyo scope incluya
 // el indicado. El token es de uso unico por accion sensible.
 function requireOwnerAuthorization(scope) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     if (isAdmin(req.user)) {
       req.ownerAuthorization = { byAdmin: true, scope };
       return next();
@@ -94,10 +95,27 @@ function requireOwnerAuthorization(scope) {
         throw new Error("invalid_scope");
       }
 
+      let request = null;
+      if (payload.requestId) {
+        request = await AuthRepository.findAuthorizationRequestById(payload.requestId);
+        if (!request || request.estado !== "approved") {
+          throw new Error("request_not_approved");
+        }
+        if (Number(request.solicitante_empleado_id) !== Number(req.user?.id)) {
+          throw new Error("request_owner_mismatch");
+        }
+        if (request.code_expires_at && new Date(request.code_expires_at).getTime() <= Date.now()) {
+          await AuthRepository.expireAuthorizationRequest(request.id);
+          throw new Error("request_expired");
+        }
+      }
+
       req.ownerAuthorization = {
         byAdmin: false,
         scope,
         ownerEmpleadoId: payload.ownerEmpleadoId,
+        requestId: payload.requestId || null,
+        authorizedPayload: payload.authorizedPayload || null,
       };
       return next();
     } catch (error) {

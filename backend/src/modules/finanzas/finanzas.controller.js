@@ -59,17 +59,17 @@ const FinanzasController = {
   },
 
   async crearMovimientoTitular(req, res) {
-    const data = await FinanzasService.crearMovimientoTitular(req.body, req.user?.id);
+    const data = await FinanzasService.crearMovimientoTitular(req.body, req.user?.id, req.ownerAuthorization);
     return res.status(201).json({ ok: true, data });
   },
 
   async actualizarMovimientoTitular(req, res) {
-    const data = await FinanzasService.actualizarMovimientoTitular(Number(req.params.id), req.body);
+    const data = await FinanzasService.actualizarMovimientoTitular(Number(req.params.id), req.body, req.ownerAuthorization);
     return res.json({ ok: true, data });
   },
 
   async eliminarMovimientoTitular(req, res) {
-    await FinanzasService.eliminarMovimientoTitular(Number(req.params.id));
+    await FinanzasService.eliminarMovimientoTitular(Number(req.params.id), req.ownerAuthorization);
     return res.json({ ok: true, message: "Movimiento eliminado." });
   },
 

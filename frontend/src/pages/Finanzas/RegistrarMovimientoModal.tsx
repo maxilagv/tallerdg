@@ -59,7 +59,7 @@ interface Props {
   open:     boolean;
   onClose:  () => void;
   /** Si se pasa un movimiento, el modal abre en modo edición */
-  movimiento?: { id: number; tipo: TipoMovimientoTitular; monto: number; concepto: string; referencia: string | null; fecha: string; notas: string | null } | null;
+  movimiento?: { id: number; tipo: TipoMovimientoTitular; monto: number; metodo_pago?: "efectivo" | "transferencia"; concepto: string; referencia: string | null; fecha: string; notas: string | null } | null;
 }
 
 export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
@@ -71,6 +71,7 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
 
   const [tipo,       setTipo]       = useState<TipoMovimientoTitular>(movimiento?.tipo ?? "aporte_titular");
   const [monto,      setMonto]      = useState(movimiento ? String(movimiento.monto) : "");
+  const [metodoPago, setMetodoPago] = useState<"efectivo" | "transferencia">(movimiento?.metodo_pago ?? "efectivo");
   const [concepto,   setConcepto]   = useState(movimiento?.concepto ?? "");
   const [referencia, setReferencia] = useState(movimiento?.referencia ?? "");
   const [fecha,      setFecha]      = useState(movimiento?.fecha?.slice(0, 10) ?? today());
@@ -89,6 +90,7 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
   useEffect(() => {
     if (open) {
       setSugeridos(getConceptosSugeridos());
+      setMetodoPago(movimiento?.metodo_pago ?? "efectivo");
       setShowDetails(!!(movimiento?.referencia || movimiento?.notas));
       setOwnerModalOpen(false);
       setPendingPayload(null);
@@ -128,6 +130,7 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
     const payload: MovimientoTitularPayload = {
       tipo,
       monto:      montoNum,
+      metodo_pago: metodoPago,
       concepto:   concepto.trim(),
       referencia: referencia.trim() || null,
       fecha,
@@ -206,6 +209,30 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
               className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-sm text-text outline-none transition focus:border-primary"
               required
             />
+          </div>
+
+          {/* Concepto */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-text-muted">Metodo *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: "efectivo", label: "Efectivo" },
+                { value: "transferencia", label: "Transferencia" },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setMetodoPago(item.value as "efectivo" | "transferencia")}
+                  className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                    metodoPago === item.value
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border bg-surface-3 text-text-muted hover:text-text"
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Concepto */}

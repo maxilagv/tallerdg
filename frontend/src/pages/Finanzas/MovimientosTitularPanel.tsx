@@ -216,6 +216,7 @@ export function MovimientosTitularPanel({ desde, hasta }: Props) {
                     <p className="truncate text-sm font-medium text-text">{mov.concepto}</p>
                     <p className="text-xs text-text-muted">
                       {formatFechaCorta(mov.fecha)}
+                      <span className="ml-1 opacity-60">· {mov.metodo_pago === "transferencia" ? "Transferencia" : "Efectivo"}</span>
                       {mov.referencia && <span className="ml-1 opacity-60">· {mov.referencia}</span>}
                       {mov.empleado_nombre && <span className="ml-1 opacity-60">· {mov.empleado_nombre}</span>}
                     </p>

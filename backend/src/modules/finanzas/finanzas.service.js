@@ -1,6 +1,7 @@
 const ExcelJS = require("exceljs");
 const AppError = require("../../shared/errors/AppError");
 const FinanzasRepository = require("./finanzas.repository");
+const AuthRepository = require("../auth/auth.repository");
 const ConfiguracionService = require("../configuracion/configuracion.service");
 const ConfiguracionRepository = require("../configuracion/configuracion.repository");
 const {
@@ -270,6 +271,33 @@ function parseEstadoResetCaja(config = {}) {
   };
 }
 
+function normalizeForAuthorization(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "number") return Number(value);
+  if (typeof value === "string") return value.trim();
+  return value;
+}
+
+function assertAuthorizedPayload(parsedPayload, ownerAuthorization) {
+  if (!ownerAuthorization?.requestId) return;
+  const authorized = ownerAuthorization.authorizedPayload || {};
+  const fields = ["tipo", "monto", "metodo_pago", "concepto", "referencia", "fecha", "notas"];
+  const mismatch = fields.some((field) => {
+    const expected = normalizeForAuthorization(authorized[field]);
+    const actual = normalizeForAuthorization(parsedPayload[field]);
+    return String(expected) !== String(actual);
+  });
+  if (mismatch) {
+    throw new AppError("La autorizacion no corresponde a esta operacion.", 403, "OWNER_AUTHORIZATION_PAYLOAD_MISMATCH");
+  }
+}
+
+async function markOwnerAuthorizationUsed(ownerAuthorization) {
+  if (ownerAuthorization?.requestId) {
+    await AuthRepository.markAuthorizationRequestUsed(ownerAuthorization.requestId);
+  }
+}
+
 async function getOpcionesCaja() {
   const estado = parseEstadoResetCaja(await ConfiguracionService.obtener());
   return {
@@ -363,29 +391,34 @@ const FinanzasService = {
     return FinanzasRepository.getMovimientosTitular({ ...parsed.data, ...(await getOpcionesCaja()) });
   },
 
-  async crearMovimientoTitular(body, empleadoId) {
+  async crearMovimientoTitular(body, empleadoId, ownerAuthorization = null) {
     const parsed = movimientoTitularCreateSchema.safeParse(body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Datos inválidos.", 400, "VALIDATION_ERROR");
 
-    return FinanzasRepository.crearMovimientoTitular({
+    assertAuthorizedPayload(parsed.data, ownerAuthorization);
+    const resultado = await FinanzasRepository.crearMovimientoTitular({
       ...parsed.data,
       empleado_id: empleadoId || null,
     });
+    await markOwnerAuthorizationUsed(ownerAuthorization);
+    return resultado;
   },
 
-  async actualizarMovimientoTitular(id, body) {
+  async actualizarMovimientoTitular(id, body, ownerAuthorization = null) {
     const parsed = movimientoTitularUpdateSchema.safeParse(body);
     if (!parsed.success) throw new AppError(parsed.error.issues[0]?.message || "Datos inválidos.", 400, "VALIDATION_ERROR");
     if (!Object.keys(parsed.data).length) throw new AppError("Sin campos para actualizar.", 400, "VALIDATION_ERROR");
 
     const resultado = await FinanzasRepository.actualizarMovimientoTitular(id, parsed.data);
     if (!resultado) throw new AppError("Movimiento no encontrado.", 404, "NOT_FOUND");
+    await markOwnerAuthorizationUsed(ownerAuthorization);
     return resultado;
   },
 
-  async eliminarMovimientoTitular(id) {
+  async eliminarMovimientoTitular(id, ownerAuthorization = null) {
     const filas = await FinanzasRepository.eliminarMovimientoTitular(id);
     if (!filas) throw new AppError("Movimiento no encontrado.", 404, "NOT_FOUND");
+    await markOwnerAuthorizationUsed(ownerAuthorization);
   },
 
   // ── Export Excel ────────────────────────────────────────────────────────────

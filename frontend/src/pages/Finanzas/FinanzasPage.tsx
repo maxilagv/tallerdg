@@ -23,11 +23,13 @@ import { Card } from "../../shared/ui/Card";
 import { EmptyState } from "../../shared/ui/EmptyState";
 import { Skeleton } from "../../shared/ui/Skeleton";
 import { useToast } from "../../shared/ui/Toast";
+import { useAuthStore } from "../../shared/store/authStore";
 import { formatMoney } from "../../shared/utils/format";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { FinanzasCharts } from "./FinanzasCharts";
 import { MovimientosTitularPanel } from "./MovimientosTitularPanel";
 import { IngresarDineroModal } from "./IngresarDineroModal";
+import { SolicitudesAutorizacionPanel } from "./SolicitudesAutorizacionPanel";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +72,8 @@ const PERIODOS: Array<{ key: PeriodoRapido; label: string }> = [
 
 export function FinanzasPage() {
   const { add } = useToast();
+  const empleado = useAuthStore((state) => state.empleado);
+  const esAdmin = empleado?.permisos?.["*"] === "rw";
   const hoy = formatLocalDate(new Date());
   const [periodo, setPeriodo] = useState<PeriodoRapido>("diario");
   const [desde, setDesde] = useState(hoy);
@@ -174,6 +178,8 @@ export function FinanzasPage() {
   const resultado    = resumen?.resultado_neto  ?? 0;
   const aportes      = resumen?.aportes_titular ?? 0;
   const retiros      = resumen?.retiros_titular ?? 0;
+  const aportesEfectivo = resumen?.aportes_titular_efectivo ?? aportes;
+  const retirosEfectivo = resumen?.retiros_titular_efectivo ?? retiros;
   const saldoCaja    = resumen?.saldo_efectivo  ?? 0;
   const cobrosEfectivo = resumen?.cobros_efectivo ?? 0;
   const abonosDeudaEfectivo = resumen?.abonos_deuda_efectivo ?? 0;
@@ -213,6 +219,8 @@ export function FinanzasPage() {
       </div>
 
       {/* ── Filtro de período ────────────────────────────────────────────────── */}
+      {esAdmin && <SolicitudesAutorizacionPanel />}
+
       <Card>
         <p className="mb-3 text-sm font-medium text-text-muted">Período</p>
         <div className="mb-4 flex flex-wrap gap-2">
@@ -282,8 +290,8 @@ export function FinanzasPage() {
           <SaldoCajaCard
             saldo={saldoCaja}
             resultado={resultado}
-            aportes={aportes}
-            retiros={retiros}
+            aportes={aportesEfectivo}
+            retiros={retirosEfectivo}
             cobrosEfectivo={cobrosEfectivo}
             abonosDeudaEfectivo={abonosDeudaEfectivo}
             vrEfectivo={vrEfectivo}

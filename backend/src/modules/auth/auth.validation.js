@@ -11,4 +11,25 @@ const ownerAuthorizationSchema = z.object({
   scope: z.string().min(1, "Falta el motivo de la autorizacion").optional(),
 });
 
-module.exports = { loginSchema, ownerAuthorizationSchema };
+const ownerAuthorizationRequestSchema = z.object({
+  scope: z.string().min(1, "Falta el motivo de la autorizacion"),
+  accion: z.string().min(1, "Falta la accion a autorizar").max(80),
+  payload: z.record(z.string(), z.any()),
+});
+
+const rejectAuthorizationRequestSchema = z.object({
+  reason: z.string().max(255).optional().nullable(),
+});
+
+const redeemAuthorizationRequestSchema = z.object({
+  requestId: z.coerce.number().int().positive("Solicitud invalida"),
+  code: z.string().trim().regex(/^\d{6}$/, "El codigo debe tener 6 digitos"),
+});
+
+module.exports = {
+  loginSchema,
+  ownerAuthorizationSchema,
+  ownerAuthorizationRequestSchema,
+  rejectAuthorizationRequestSchema,
+  redeemAuthorizationRequestSchema,
+};

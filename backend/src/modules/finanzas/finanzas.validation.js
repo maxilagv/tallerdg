@@ -59,6 +59,7 @@ const movimientosSchema = z
 // ── Movimientos del Titular ────────────────────────────────────────────────────
 
 const tiposMovimientoTitular = ["aporte_titular", "retiro_titular"];
+const metodosMovimientoCaja = ["efectivo", "transferencia"];
 
 /**
  * Schema para crear o actualizar un movimiento del titular.
@@ -72,6 +73,7 @@ const movimientoTitularCreateSchema = z.object({
     .number({ invalid_type_error: "El monto debe ser un número." })
     .positive("El monto debe ser mayor que cero.")
     .max(999_999_999, "El monto es demasiado alto."),
+  metodo_pago: z.enum(metodosMovimientoCaja).default("efectivo"),
   concepto: z
     .string()
     .min(3, "El concepto debe tener al menos 3 caracteres.")

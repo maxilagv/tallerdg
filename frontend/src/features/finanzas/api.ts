@@ -23,6 +23,8 @@ export interface FinanzasResumen {
   // Movimientos del titular (NO operativos)
   aportes_titular:       number;
   retiros_titular:       number;
+  aportes_titular_efectivo: number;
+  retiros_titular_efectivo: number;
   neto_titular:          number;
   cantidad_movimientos_titular: number;
   // Saldo Real = resultado_neto + neto_titular (compatibilidad)
@@ -129,6 +131,7 @@ export interface MovimientoTitular {
   id:             number;
   tipo:           TipoMovimientoTitular;
   monto:          number;
+  metodo_pago:    "efectivo" | "transferencia";
   concepto:       string;
   referencia:     string | null;
   fecha:          string;
@@ -143,6 +146,7 @@ export interface MovimientoTitular {
 export interface MovimientoTitularPayload {
   tipo:       TipoMovimientoTitular;
   monto:      number;
+  metodo_pago?: "efectivo" | "transferencia";
   concepto:   string;
   referencia?: string | null;
   fecha:      string;

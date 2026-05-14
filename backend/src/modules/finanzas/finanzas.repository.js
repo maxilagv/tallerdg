@@ -301,6 +301,8 @@ const FinanzasRepository = {
         .select(
           db.raw("COALESCE(SUM(CASE WHEN tipo='aporte_titular' THEN monto ELSE 0 END), 0) as aportes"),
           db.raw("COALESCE(SUM(CASE WHEN tipo='retiro_titular' THEN monto ELSE 0 END), 0) as retiros"),
+          db.raw("COALESCE(SUM(CASE WHEN tipo='aporte_titular' AND COALESCE(metodo_pago, 'efectivo')='efectivo' THEN monto ELSE 0 END), 0) as aportes_efectivo"),
+          db.raw("COALESCE(SUM(CASE WHEN tipo='retiro_titular' AND COALESCE(metodo_pago, 'efectivo')='efectivo' THEN monto ELSE 0 END), 0) as retiros_efectivo"),
           db.raw("COUNT(*) as cantidad")
         )
         .first(),
@@ -311,7 +313,9 @@ const FinanzasRepository = {
         .modify((q) => aplicarCorteFechaYCreated(q, "fecha", "created_at", options))
         .select(
           db.raw("COALESCE(SUM(CASE WHEN tipo='aporte_titular' THEN monto ELSE 0 END), 0) as aportes"),
-          db.raw("COALESCE(SUM(CASE WHEN tipo='retiro_titular' THEN monto ELSE 0 END), 0) as retiros")
+          db.raw("COALESCE(SUM(CASE WHEN tipo='retiro_titular' THEN monto ELSE 0 END), 0) as retiros"),
+          db.raw("COALESCE(SUM(CASE WHEN tipo='aporte_titular' AND COALESCE(metodo_pago, 'efectivo')='efectivo' THEN monto ELSE 0 END), 0) as aportes_efectivo"),
+          db.raw("COALESCE(SUM(CASE WHEN tipo='retiro_titular' AND COALESCE(metodo_pago, 'efectivo')='efectivo' THEN monto ELSE 0 END), 0) as retiros_efectivo")
         )
         .first(),
     ]);
@@ -337,8 +341,12 @@ const FinanzasRepository = {
     const totalCompras         = totalComprasCaja + totalPagosProveedores;
     const totalAportes         = Number(titular?.aportes)           || 0;
     const totalRetiros         = Number(titular?.retiros)           || 0;
+    const totalAportesEfectivo = Number(titular?.aportes_efectivo)  || 0;
+    const totalRetirosEfectivo = Number(titular?.retiros_efectivo)  || 0;
     const totalAportesArrastre = Number(titularArrastre?.aportes)   || 0;
     const totalRetirosArrastre = Number(titularArrastre?.retiros)   || 0;
+    const totalAportesEfectivoArrastre = Number(titularArrastre?.aportes_efectivo) || 0;
+    const totalRetirosEfectivoArrastre = Number(titularArrastre?.retiros_efectivo) || 0;
 
     const totalIngresos      = totalCobros + totalAbonosDeuda + totalVR;
     const totalEgresos       = totalGastos + totalCompras;
@@ -349,8 +357,8 @@ const FinanzasRepository = {
       totalAbonosDeudaEfectivoArrastre +
       totalVREfectivoArrastre -
       totalGastosEfectivoArrastre +
-      totalAportesArrastre -
-      totalRetirosArrastre -
+      totalAportesEfectivoArrastre -
+      totalRetirosEfectivoArrastre -
       totalPagosProveedoresEfectivoArrastre;
 
     const saldoEfectivoInicial = saldoEfectivoArrastre;
@@ -362,8 +370,8 @@ const FinanzasRepository = {
       totalAbonosDeudaEfectivo +
       totalVREfectivo -
       totalGastosEfectivo +
-      totalAportes -
-      totalRetiros -
+      totalAportesEfectivo -
+      totalRetirosEfectivo -
       totalPagosProveedoresEfectivo;
 
     return {
@@ -384,6 +392,8 @@ const FinanzasRepository = {
       // ── Movimientos del titular ────────────────────────────────────────────
       aportes_titular:       totalAportes,
       retiros_titular:       totalRetiros,
+      aportes_titular_efectivo: totalAportesEfectivo,
+      retiros_titular_efectivo: totalRetirosEfectivo,
       neto_titular:          netoTitular,
       cantidad_movimientos_titular: Number(titular?.cantidad) || 0,
       // ── SALDO FÍSICO DE CAJA (solo efectivo) ─────────────────────────────
@@ -768,7 +778,7 @@ const FinanzasRepository = {
           CONCAT(mc.concepto,
             CASE WHEN mc.referencia IS NOT NULL AND mc.referencia != ''
                  THEN CONCAT(' - Ref: ', mc.referencia) ELSE '' END),
-          NULL
+          COALESCE(mc.metodo_pago, 'efectivo')
         FROM movimientos_caja mc WHERE mc.activo = 1 AND mc.fecha BETWEEN ? AND ?${titularCorte.sql}
 
       ) mov ORDER BY fecha ASC, fecha_hora ASC, tipo ASC
@@ -869,7 +879,7 @@ const FinanzasRepository = {
           CONCAT(mc.concepto,
             CASE WHEN mc.referencia IS NOT NULL AND mc.referencia != ''
                  THEN CONCAT(' · Ref: ', mc.referencia) ELSE '' END),
-          NULL
+          COALESCE(mc.metodo_pago, 'efectivo')
         FROM movimientos_caja mc WHERE mc.activo = 1 AND mc.fecha BETWEEN ? AND ?${titularCorte.sql}
 
       ) mov ORDER BY fecha DESC, tipo ASC
