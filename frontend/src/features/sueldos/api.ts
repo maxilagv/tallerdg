@@ -31,6 +31,25 @@ export interface Adelanto {
   created_at: string;
 }
 
+export type TipoDescuentoSueldo = "falta" | "tardanza";
+
+export interface DescuentoSueldo {
+  id: number;
+  periodo_id: number;
+  empleado_id: number;
+  tipo: TipoDescuentoSueldo;
+  fecha: string;
+  cantidad: number;
+  horas_jornada?: number | null;
+  valor_dia: number;
+  valor_hora?: number | null;
+  monto: number;
+  motivo?: string | null;
+  anulado_at?: string | null;
+  motivo_anulacion?: string | null;
+  created_at: string;
+}
+
 export interface PeriodoSueldo {
   id: number;
   empleado_id: number;
@@ -40,7 +59,9 @@ export interface PeriodoSueldo {
   estado: EstadoPeriodo;
   pagado_at?: string | null;
   total_adelantos: number;
+  total_descuentos: number;
   adelantos?: Adelanto[];
+  descuentos?: DescuentoSueldo[];
 }
 
 export interface EmpleadoResumen {
@@ -66,6 +87,14 @@ export interface HistorialResponse {
 export interface AdelantoResult {
   adelanto: Adelanto;
   supera_saldo: boolean;
+  saldo_disponible: number;
+}
+
+export interface DescuentoResult {
+  descuento: DescuentoSueldo;
+  monto_calculado: number;
+  valor_dia: number;
+  valor_hora: number | null;
   saldo_disponible: number;
 }
 
@@ -103,8 +132,26 @@ export const sueldosApi = {
       payload
     ),
 
+  registrarDescuento: (
+    periodoId: number,
+    payload: {
+      tipo: TipoDescuentoSueldo;
+      fecha?: string;
+      cantidad: number;
+      horas_jornada?: number | null;
+      motivo?: string | null;
+    }
+  ) =>
+    api.post<{ ok: boolean; data: DescuentoResult }>(
+      `/sueldos/periodos/${periodoId}/descuentos`,
+      payload
+    ),
+
   anularAdelanto: (adelantoId: number, motivo: string) =>
     api.post<{ ok: boolean; data: Adelanto }>(`/sueldos/adelantos/${adelantoId}/anular`, { motivo }),
+
+  anularDescuento: (descuentoId: number, motivo: string) =>
+    api.post<{ ok: boolean; data: DescuentoSueldo }>(`/sueldos/descuentos/${descuentoId}/anular`, { motivo }),
 
   getHistorial: (empleadoId: number, params?: Record<string, unknown>) =>
     api.get<{ ok: boolean; data: HistorialResponse }>(`/sueldos/${empleadoId}/historial`, { params }),

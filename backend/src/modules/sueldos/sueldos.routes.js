@@ -29,4 +29,8 @@ router.post("/periodos/:periodoId/liquidar", requirePermiso("empleados", "w"), S
 router.post("/adelantos/:adelantoId/anular", requirePermiso("empleados", "w"), SueldosController.anularAdelanto);
 router.post("/periodos/:periodoId/adelantos", requirePermiso("empleados", "w"), SueldosController.registrarAdelanto);
 
+// Descuentos por faltas y tardanzas
+router.post("/descuentos/:descuentoId/anular", requirePermiso("empleados", "w"), SueldosController.anularDescuento);
+router.post("/periodos/:periodoId/descuentos", requirePermiso("empleados", "w"), SueldosController.registrarDescuento);
+
 module.exports = router;

@@ -1,7 +1,7 @@
 const { Router } = require("express");
 const VentasRapidasController = require("./ventas_rapidas.controller");
 const authMiddleware = require("../../shared/middleware/auth.middleware");
-const { requirePermiso } = require("../../shared/middleware/roles.middleware");
+const { requireOwnerAuthorization, requirePermiso } = require("../../shared/middleware/roles.middleware");
 
 const router = Router();
 
@@ -12,5 +12,6 @@ router.get("/saldo-caja-hoy", requirePermiso("productos", "r"), VentasRapidasCon
 router.get("/:id/comprobante/pdf", requirePermiso("productos", "r"), VentasRapidasController.imprimirComprobante);
 router.get("/:id",            requirePermiso("productos", "r"), VentasRapidasController.obtener);
 router.post("/",              requirePermiso("productos", "w"), VentasRapidasController.crear);
+router.patch("/:id/medio-pago", requirePermiso("productos", "w"), requireOwnerAuthorization("cash_manual_movements"), VentasRapidasController.actualizarMedioPago);
 
 module.exports = router;

@@ -66,6 +66,15 @@ export const ventasRapidasApi = {
   crear: (payload: CreateVentaRapidaPayload) =>
     api.post<{ ok: boolean; data: VentaRapida }>("/ventas-rapidas", payload),
 
+  actualizarMedioPago: (id: number, payload: { medio_pago: MedioPago }, ownerAuthorizationToken?: string | null) =>
+    api.patch<{ ok: boolean; data: VentaRapida }>(
+      `/ventas-rapidas/${id}/medio-pago`,
+      payload,
+      ownerAuthorizationToken
+        ? { headers: { "X-Owner-Authorization": ownerAuthorizationToken } }
+        : undefined
+    ),
+
   imprimirComprobante: (id: number) =>
     api.get<Blob>(`/ventas-rapidas/${id}/comprobante/pdf`, { responseType: "blob" }),
 };

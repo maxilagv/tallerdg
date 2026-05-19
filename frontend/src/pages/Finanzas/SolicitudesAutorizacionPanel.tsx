@@ -20,7 +20,33 @@ function formatHora(value: string) {
 }
 
 function metodoLabel(value: unknown) {
-  return value === "transferencia" ? "Transferencia" : "Efectivo";
+  const labels: Record<string, string> = {
+    efectivo: "Efectivo",
+    transferencia: "Transferencia",
+    tarjeta: "Tarjeta",
+    otro: "Otro",
+  };
+  return labels[String(value)] ?? "Efectivo";
+}
+
+function requestTitle(request: OwnerAuthorizationRequest) {
+  const payload = request.payload || {};
+  if (request.accion === "actualizar_medio_pago_venta_rapida") {
+    return `Corregir venta #${payload.venta_id} a ${metodoLabel(payload.medio_pago)}`;
+  }
+
+  const monto = Number(payload.monto || 0);
+  const tipo = payload.tipo === "retiro_titular" ? "Retiro de caja" : "Ingreso manual";
+  return `${tipo}: ${formatMoney(monto)} por ${metodoLabel(payload.metodo_pago)}`;
+}
+
+function requestDescription(request: OwnerAuthorizationRequest) {
+  const payload = request.payload || {};
+  if (request.accion === "actualizar_medio_pago_venta_rapida") {
+    return "Caja Rapida - correccion de metodo de pago";
+  }
+
+  return `${String(payload.concepto || "Movimiento manual")} - ${formatFecha(payload.fecha)}`;
 }
 
 export function SolicitudesAutorizacionPanel() {
@@ -95,8 +121,6 @@ export function SolicitudesAutorizacionPanel() {
       {!query.isLoading && rows.length > 0 && (
         <div className="space-y-2">
           {rows.map((request) => {
-            const payload = request.payload || {};
-            const monto = Number(payload.monto || 0);
             const loading = approve.isPending || reject.isPending;
             return (
               <div
@@ -112,12 +136,8 @@ export function SolicitudesAutorizacionPanel() {
                       {request.solicitante.nombre} {formatHora(request.created_at)}
                     </span>
                   </div>
-                  <p className="text-sm font-semibold text-text">
-                    {formatMoney(monto)} por {metodoLabel(payload.metodo_pago)}
-                  </p>
-                  <p className="truncate text-xs text-text-muted">
-                    {String(payload.concepto || "Ingreso manual")} - {formatFecha(payload.fecha)}
-                  </p>
+                  <p className="text-sm font-semibold text-text">{requestTitle(request)}</p>
+                  <p className="truncate text-xs text-text-muted">{requestDescription(request)}</p>
                 </div>
                 <div className="flex items-center gap-2 md:justify-end">
                   <Button

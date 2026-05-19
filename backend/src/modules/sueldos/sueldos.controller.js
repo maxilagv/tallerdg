@@ -40,9 +40,23 @@ const SueldosController = {
     return res.status(201).json({ ok: true, data });
   },
 
+  async registrarDescuento(req, res) {
+    const data = await SueldosService.registrarDescuento(
+      req.params.periodoId,
+      req.body,
+      req.user?.id
+    );
+    return res.status(201).json({ ok: true, data });
+  },
+
   async anularAdelanto(req, res) {
     const data = await SueldosService.anularAdelanto(req.params.adelantoId, req.body, req.user?.id);
     return res.json({ ok: true, data, message: "Adelanto anulado." });
+  },
+
+  async anularDescuento(req, res) {
+    const data = await SueldosService.anularDescuento(req.params.descuentoId, req.body, req.user?.id);
+    return res.json({ ok: true, data, message: "Descuento anulado." });
   },
 
   async getHistorial(req, res) {

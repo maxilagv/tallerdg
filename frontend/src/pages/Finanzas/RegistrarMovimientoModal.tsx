@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, ChevronDown, ChevronUp, KeyRound } from "lucide-react";
 import { finanzasApi, type MovimientoTitularPayload, type TipoMovimientoTitular } from "../../features/finanzas/api";
+import { authApi, type OwnerAuthorizationRequest } from "../../features/auth/api";
 import { Modal } from "../../shared/ui/Modal";
 import { Button } from "../../shared/ui/Button";
 import { useToast } from "../../shared/ui/Toast";
 import { useAuthStore } from "../../shared/store/authStore";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
-import { OwnerAuthorizationModal } from "./OwnerAuthorizationModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -84,16 +84,18 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
   const [sugeridos, setSugeridos] = useState<string[]>([]);
 
   // Autorizacion del dueño (solo si el usuario no es admin)
-  const [ownerModalOpen, setOwnerModalOpen] = useState(false);
+  const [codigo, setCodigo] = useState("");
   const [pendingPayload, setPendingPayload] = useState<MovimientoTitularPayload | null>(null);
+  const [authorizationRequest, setAuthorizationRequest] = useState<OwnerAuthorizationRequest | null>(null);
 
   useEffect(() => {
     if (open) {
       setSugeridos(getConceptosSugeridos());
       setMetodoPago(movimiento?.metodo_pago ?? "efectivo");
       setShowDetails(!!(movimiento?.referencia || movimiento?.notas));
-      setOwnerModalOpen(false);
+      setCodigo("");
       setPendingPayload(null);
+      setAuthorizationRequest(null);
     }
   }, [open, movimiento]);
 
@@ -103,23 +105,67 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
     qc.invalidateQueries({ queryKey: ["finanzas-movimientos-titular"] });
     qc.invalidateQueries({ queryKey: ["finanzas-analisis"] });
     qc.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
+    qc.invalidateQueries({ queryKey: ["owner-authorization-requests"] });
   };
 
   const crear = useMutation({
     mutationFn: (vars: { payload: MovimientoTitularPayload; ownerToken?: string }) =>
       finanzasApi.crearMovimientoTitular(vars.payload, vars.ownerToken),
-    onSuccess: () => { invalidar(); add("Movimiento registrado.", "success"); setPendingPayload(null); onClose(); },
+    onSuccess: () => {
+      invalidar();
+      add("Movimiento registrado.", "success");
+      setPendingPayload(null);
+      setAuthorizationRequest(null);
+      setCodigo("");
+      onClose();
+    },
     onError:   (err) => add(getErrorMessage(err), "error"),
   });
 
   const editar = useMutation({
     mutationFn: (vars: { payload: Partial<MovimientoTitularPayload>; ownerToken?: string }) =>
       finanzasApi.actualizarMovimientoTitular(movimiento!.id, vars.payload, vars.ownerToken),
-    onSuccess: () => { invalidar(); add("Movimiento actualizado.", "success"); setPendingPayload(null); onClose(); },
+    onSuccess: () => {
+      invalidar();
+      add("Movimiento actualizado.", "success");
+      setPendingPayload(null);
+      setAuthorizationRequest(null);
+      setCodigo("");
+      onClose();
+    },
     onError:   (err) => add(getErrorMessage(err), "error"),
   });
 
   const isLoading = crear.isPending || editar.isPending;
+
+  const requestAuthorization = useMutation({
+    mutationFn: (payload: MovimientoTitularPayload) =>
+      authApi.createAuthorizationRequest({
+        scope: "cash_manual_movements",
+        accion: esEdicion ? "actualizar_movimiento_titular" : "crear_movimiento_titular",
+        payload,
+      }),
+    onSuccess: (response, payload) => {
+      setPendingPayload(payload);
+      setAuthorizationRequest(response.data.data);
+      add("Solicitud enviada al administrador.", "success");
+      invalidar();
+    },
+    onError: (err) => add(getErrorMessage(err), "error"),
+  });
+
+  const redeemAuthorization = useMutation({
+    mutationFn: (vars: { requestId: number; code: string }) =>
+      authApi.redeemAuthorizationRequest(vars),
+    onSuccess: (response) => {
+      if (!pendingPayload) return;
+      if (esEdicion) editar.mutate({ payload: pendingPayload, ownerToken: response.data.token });
+      else           crear.mutate({ payload: pendingPayload, ownerToken: response.data.token });
+    },
+    onError: (err) => add(getErrorMessage(err), "error"),
+  });
+
+  const loadingAll = isLoading || requestAuthorization.isPending || redeemAuthorization.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,14 +192,17 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
     }
 
     setPendingPayload(payload);
-    setOwnerModalOpen(true);
+    requestAuthorization.mutate(payload);
   };
 
-  const handleAuthorized = (token: string) => {
-    setOwnerModalOpen(false);
-    if (!pendingPayload) return;
-    if (esEdicion) editar.mutate({ payload: pendingPayload, ownerToken: token });
-    else           crear.mutate({ payload: pendingPayload, ownerToken: token });
+  const handleRedeem = () => {
+    if (!authorizationRequest) return;
+    const cleanCode = codigo.trim();
+    if (!/^\d{6}$/.test(cleanCode)) {
+      add("El codigo debe tener 6 digitos.", "error");
+      return;
+    }
+    redeemAuthorization.mutate({ requestId: authorizationRequest.id, code: cleanCode });
   };
 
   return (
@@ -168,7 +217,7 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
           {!esAdmin && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5">
               <p className="text-xs text-amber-200">
-                Como no sos admin, vamos a pedir la autorizacion del dueño antes de confirmar.
+                Como no sos admin, vamos a enviar una solicitud al administrador para que te de un codigo.
               </p>
             </div>
           )}
@@ -320,10 +369,37 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
             </div>
           )}
 
+          {!esAdmin && authorizationRequest && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+              <div className="mb-3 flex items-start gap-2">
+                <KeyRound size={16} className="mt-0.5 shrink-0 text-amber-300" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-100">Solicitud enviada</p>
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    Pedile al administrador el codigo de 6 digitos para esta operacion.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={codigo}
+                  onChange={(event) => setCodigo(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Codigo"
+                  className="w-full rounded-xl border border-border bg-surface-3 px-3 py-2.5 text-center text-lg font-bold tracking-[0.35em] text-text outline-none transition focus:border-primary"
+                />
+                <Button type="button" onClick={handleRedeem} loading={redeemAuthorization.isPending || isLoading}>
+                  Validar
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Acciones */}
           <div className="flex justify-end gap-3 pt-1">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>Cancelar</Button>
-            <Button type="submit" loading={isLoading} disabled={isLoading}>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={loadingAll}>Cancelar</Button>
+            <Button type="submit" loading={requestAuthorization.isPending || isLoading} disabled={loadingAll || !!authorizationRequest}>
               {esEdicion
                 ? esAdmin ? "Guardar cambios" : "Pedir autorizacion"
                 : esAdmin ? "Registrar" : "Pedir autorizacion"}
@@ -332,20 +408,6 @@ export function RegistrarMovimientoModal({ open, onClose, movimiento }: Props) {
         </form>
       </Modal>
 
-      <OwnerAuthorizationModal
-        open={ownerModalOpen}
-        scope="cash_manual_movements"
-        description={
-          esEdicion
-            ? "Para modificar este movimiento manual de caja necesitamos el visto bueno del dueño o un administrador."
-            : "Para registrar un movimiento manual de caja necesitamos el visto bueno del dueño o un administrador."
-        }
-        onClose={() => {
-          setOwnerModalOpen(false);
-          setPendingPayload(null);
-        }}
-        onAuthorized={handleAuthorized}
-      />
     </>
   );
 }

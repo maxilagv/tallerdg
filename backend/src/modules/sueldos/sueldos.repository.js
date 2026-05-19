@@ -114,6 +114,14 @@ const SueldosRepository = {
       .select("a.*", "g.metodo_pago");
   },
 
+  async getDescuentosDePeriodo(periodoId) {
+    return db("descuentos_sueldo")
+      .where({ periodo_id: periodoId })
+      .whereNull("anulado_at")
+      .orderBy("fecha", "asc")
+      .orderBy("created_at", "asc");
+  },
+
   async liquidarPeriodo(periodoId, pagadoPorEmpleadoId, metodoPago = "efectivo") {
     const periodo = await db("periodos_sueldo").where({ id: periodoId }).first();
     if (!periodo) throw new Error("Periodo no encontrado.");
@@ -124,9 +132,14 @@ const SueldosRepository = {
       .where({ periodo_id: periodoId })
       .whereNull("anulado_at")
       .sum("monto as total_adelantos");
+    const [{ total_descuentos }] = await db("descuentos_sueldo")
+      .where({ periodo_id: periodoId })
+      .whereNull("anulado_at")
+      .sum("monto as total_descuentos");
 
     const adelantos = Number(total_adelantos) || 0;
-    const saldoRestante = Number(periodo.sueldo_base) - adelantos;
+    const descuentos = Number(total_descuentos) || 0;
+    const saldoRestante = Number(periodo.sueldo_base) - adelantos - descuentos;
 
     return db.transaction(async (trx) => {
       let gastoId = null;
@@ -198,6 +211,28 @@ const SueldosRepository = {
     });
   },
 
+  async registrarDescuento(periodoId, data, registradoPorId) {
+    const periodo = await db("periodos_sueldo").where({ id: periodoId }).first();
+    if (!periodo) throw new Error("Periodo no encontrado.");
+    if (periodo.estado === "pagado") throw new Error("El periodo ya fue liquidado.");
+
+    const [descuentoId] = await db("descuentos_sueldo").insert({
+      periodo_id: periodoId,
+      empleado_id: periodo.empleado_id,
+      tipo: data.tipo,
+      fecha: data.fecha,
+      cantidad: data.cantidad,
+      horas_jornada: data.horas_jornada || null,
+      valor_dia: data.valor_dia,
+      valor_hora: data.valor_hora,
+      monto: data.monto,
+      motivo: data.motivo?.trim() || null,
+      registrado_por_empleado_id: registradoPorId || null,
+    });
+
+    return db("descuentos_sueldo").where({ id: descuentoId }).first();
+  },
+
   async anularAdelanto(adelantoId, { motivo }, anuladoPorId) {
     return db.transaction(async (trx) => {
       const adelanto = await trx("adelantos_sueldo")
@@ -240,6 +275,37 @@ const SueldosRepository = {
     });
   },
 
+  async anularDescuento(descuentoId, { motivo }, anuladoPorId) {
+    return db.transaction(async (trx) => {
+      const descuento = await trx("descuentos_sueldo")
+        .where({ id: descuentoId })
+        .forUpdate()
+        .first();
+
+      if (!descuento) throw new Error("Descuento no encontrado.");
+      if (descuento.anulado_at) throw new Error("El descuento ya fue anulado.");
+
+      const periodo = await trx("periodos_sueldo")
+        .where({ id: descuento.periodo_id })
+        .forUpdate()
+        .first();
+
+      if (!periodo) throw new Error("Periodo no encontrado.");
+      if (periodo.estado === "pagado") {
+        throw new Error("No se puede anular un descuento de un periodo ya liquidado.");
+      }
+
+      await trx("descuentos_sueldo").where({ id: descuentoId }).update({
+        anulado_at: trx.fn.now(),
+        anulado_por_empleado_id: anuladoPorId || null,
+        motivo_anulacion: motivo,
+        updated_at: trx.fn.now(),
+      });
+
+      return trx("descuentos_sueldo").where({ id: descuentoId }).first();
+    });
+  },
+
   async getResumenEmpleados() {
     const empleados = await db("empleados as e")
       .join("roles as r", "e.rol_id", "r.id")
@@ -259,12 +325,19 @@ const SueldosRepository = {
 
         let adelantos = 0;
         let adelantosDetalle = [];
+        let descuentos = 0;
+        let descuentosDetalle = [];
         if (periodoAbierto) {
           const [{ suma }] = await db("adelantos_sueldo")
             .where({ periodo_id: periodoAbierto.id })
             .whereNull("anulado_at")
             .sum("monto as suma");
           adelantos = Number(suma) || 0;
+          const [{ suma_descuentos }] = await db("descuentos_sueldo")
+            .where({ periodo_id: periodoAbierto.id })
+            .whereNull("anulado_at")
+            .sum("monto as suma_descuentos");
+          descuentos = Number(suma_descuentos) || 0;
           adelantosDetalle = await db("adelantos_sueldo as a")
             .leftJoin("gastos as g", "a.gasto_id", "g.id")
             .where("a.periodo_id", periodoAbierto.id)
@@ -272,13 +345,24 @@ const SueldosRepository = {
             .orderBy("a.fecha", "desc")
             .orderBy("a.created_at", "desc")
             .select("a.*", "g.metodo_pago");
+          descuentosDetalle = await db("descuentos_sueldo")
+            .where({ periodo_id: periodoAbierto.id })
+            .whereNull("anulado_at")
+            .orderBy("fecha", "desc")
+            .orderBy("created_at", "desc");
         }
 
         return {
           ...emp,
           config: config || null,
           periodo_actual: periodoAbierto
-            ? { ...periodoAbierto, total_adelantos: adelantos, adelantos: adelantosDetalle }
+            ? {
+                ...periodoAbierto,
+                total_adelantos: adelantos,
+                total_descuentos: descuentos,
+                adelantos: adelantosDetalle,
+                descuentos: descuentosDetalle,
+              }
             : null,
         };
       })
@@ -306,7 +390,15 @@ const SueldosRepository = {
           .where({ periodo_id: periodo.id })
           .whereNull("anulado_at")
           .sum("monto as suma");
-        return { ...periodo, total_adelantos: Number(suma) || 0 };
+        const [{ suma_descuentos }] = await db("descuentos_sueldo")
+          .where({ periodo_id: periodo.id })
+          .whereNull("anulado_at")
+          .sum("monto as suma_descuentos");
+        return {
+          ...periodo,
+          total_adelantos: Number(suma) || 0,
+          total_descuentos: Number(suma_descuentos) || 0,
+        };
       })
     );
 

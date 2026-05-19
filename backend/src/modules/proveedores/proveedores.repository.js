@@ -79,9 +79,15 @@ const ProveedoresRepository = {
   },
 
   async softDelete(id) {
-    return db("proveedores")
-      .where({ id })
-      .update({ activo: 0, updated_at: db.fn.now() });
+    return db.transaction(async (trx) => {
+      await trx("proveedores")
+        .where({ id })
+        .update({ activo: 0, updated_at: trx.fn.now() });
+
+      await trx("cuentas_corrientes_proveedores")
+        .where({ proveedor_id: id })
+        .update({ activa: 0, updated_at: trx.fn.now() });
+    });
   },
 
   // ── CUENTA CORRIENTE ──────────────────────────────────────────────────────

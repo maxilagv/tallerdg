@@ -4,6 +4,7 @@ import {
   Banknote,
   CreditCard,
   Minus,
+  Pencil,
   Plus,
   Printer,
   Search,
@@ -26,6 +27,7 @@ import { useToast } from "../../shared/ui/Toast";
 import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { formatMoney } from "../../shared/utils/format";
 import { openPdfForPrint } from "../../shared/utils/printPdf";
+import { EditarMedioPagoVentaModal } from "./EditarMedioPagoVentaModal";
 
 interface ItemCarrito {
   producto_id: number | null;
@@ -51,6 +53,7 @@ export function CajaRapidaPage() {
   const [notas, setNotas] = useState("");
   const [ventaOk, setVentaOk] = useState(false);
   const [ultimaVenta, setUltimaVenta] = useState<VentaRapida | null>(null);
+  const [ventaEditar, setVentaEditar] = useState<VentaRapida | null>(null);
   const ivaInicializadoRef = useRef(false);
 
   const debouncedSearch = useDebounce(search, 250);
@@ -83,6 +86,13 @@ export function CajaRapidaPage() {
   });
 
   const productos = productosQuery.data?.data.data.rows ?? [];
+
+  const ventasRecientesQuery = useQuery({
+    queryKey: ["caja-rapida-ventas-recientes"],
+    queryFn: () => ventasRapidasApi.listar({ page: 1, limit: 5 }),
+  });
+
+  const ventasRecientes = ventasRecientesQuery.data?.data.data.rows ?? [];
 
   const agregarProducto = (p: { id: number; nombre: string; unidad?: string; precio_venta?: number | string | null }) => {
     setCarrito((prev) => {
@@ -166,6 +176,7 @@ export function CajaRapidaPage() {
       queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos"] });
       queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-detalle"] });
       queryClient.invalidateQueries({ queryKey: ["finanzas-movimientos-mes"] });
+      queryClient.invalidateQueries({ queryKey: ["caja-rapida-ventas-recientes"] });
       setTimeout(() => {
         setCarrito([]);
         setNotas("");
@@ -247,6 +258,39 @@ export function CajaRapidaPage() {
             </Button>
           </div>
         )}
+
+        <div className="rounded-xl border border-border bg-surface">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-text">Ventas recientes</p>
+              <p className="text-xs text-text-muted">Corregi el metodo si se cargo mal.</p>
+            </div>
+            {ventasRecientesQuery.isFetching && (
+              <span className="text-xs text-text-muted">Actualizando...</span>
+            )}
+          </div>
+          {ventasRecientes.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-text-muted">Sin ventas registradas.</p>
+          ) : (
+            <div className="divide-y divide-border/50">
+              {ventasRecientes.map((venta) => (
+                <div key={venta.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-text">
+                      Venta #{venta.id} - {formatMoney(venta.total)}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      {venta.fecha?.slice(0, 10)} - {venta.medio_pago}
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setVentaEditar(venta)}>
+                    <Pencil size={14} /> Metodo
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Resultados */}
         {search && (
@@ -350,6 +394,11 @@ export function CajaRapidaPage() {
           onConfirmar={() => mutation.mutate()}
         />
       </div>
+      <EditarMedioPagoVentaModal
+        open={!!ventaEditar}
+        venta={ventaEditar}
+        onClose={() => setVentaEditar(null)}
+      />
     </div>
   );
 }

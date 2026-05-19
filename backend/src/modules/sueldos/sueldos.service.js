@@ -6,7 +6,9 @@ const {
   abrirPeriodoSchema,
   actualizarPeriodoSchema,
   adelantoSchema,
+  descuentoSchema,
   anularAdelantoSchema,
+  anularDescuentoSchema,
   historialSchema,
 } = require("./sueldos.validation");
 
@@ -33,6 +35,37 @@ function toDateOnly(value) {
   }
 
   return String(value || "").slice(0, 10);
+}
+
+function daysInclusive(inicio, fin) {
+  const start = new Date(`${toDateOnly(inicio)}T12:00:00`);
+  const end = new Date(`${toDateOnly(fin)}T12:00:00`);
+  const diff = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  return Math.max(diff, 1);
+}
+
+function roundMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function calcularDescuento(periodo, data) {
+  const diasPeriodo = daysInclusive(periodo.fecha_inicio, periodo.fecha_fin);
+  const valorDia = roundMoney(Number(periodo.sueldo_base) / diasPeriodo);
+
+  if (data.tipo === "falta") {
+    return {
+      valor_dia: valorDia,
+      valor_hora: null,
+      monto: roundMoney(valorDia * Number(data.cantidad)),
+    };
+  }
+
+  const valorHora = roundMoney(valorDia / Number(data.horas_jornada));
+  return {
+    valor_dia: valorDia,
+    valor_hora: valorHora,
+    monto: roundMoney(valorHora * Number(data.cantidad)),
+  };
 }
 
 const SueldosService = {
@@ -168,6 +201,50 @@ const SueldosService = {
     return { adelanto, supera_saldo: supera, saldo_disponible: saldoDisponible };
   },
 
+  async registrarDescuento(periodoId, data, registradoPorId) {
+    const id = parseId(periodoId);
+
+    const periodo = await SueldosRepository.getPeriodoById(id);
+    if (!periodo) throw new AppError("Periodo no encontrado.", 404, "NOT_FOUND");
+    if (periodo.estado === "pagado") {
+      throw new AppError("El periodo ya fue liquidado.", 400, "PERIODO_CERRADO");
+    }
+
+    const parsed = descuentoSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message || "Datos invalidos.",
+        400,
+        "VALIDATION_ERROR"
+      );
+    }
+
+    const calculo = calcularDescuento(periodo, parsed.data);
+    const descuentos = await SueldosRepository.getDescuentosDePeriodo(id);
+    const totalDescuentos = descuentos.reduce((sum, descuento) => sum + Number(descuento.monto), 0);
+    const adelantos = await SueldosRepository.getAdelantosDePeriodo(id);
+    const totalAdelantos = adelantos.reduce((sum, adelanto) => sum + Number(adelanto.monto), 0);
+    const saldoDisponible = Number(periodo.sueldo_base) - totalAdelantos - totalDescuentos;
+
+    const descuento = await SueldosRepository.registrarDescuento(
+      id,
+      {
+        ...parsed.data,
+        fecha: parsed.data.fecha || new Date().toISOString().slice(0, 10),
+        ...calculo,
+      },
+      registradoPorId
+    );
+
+    return {
+      descuento,
+      monto_calculado: calculo.monto,
+      valor_dia: calculo.valor_dia,
+      valor_hora: calculo.valor_hora,
+      saldo_disponible: saldoDisponible,
+    };
+  },
+
   async anularAdelanto(adelantoId, data, anuladoPorId) {
     const id = parseId(adelantoId);
     const parsed = anularAdelantoSchema.safeParse(data);
@@ -189,6 +266,30 @@ const SueldosService = {
     } catch (err) {
       const status = err.message === "Adelanto no encontrado." ? 404 : 400;
       throw new AppError(err.message, status, "ADELANTO_ANULACION_ERROR");
+    }
+  },
+
+  async anularDescuento(descuentoId, data, anuladoPorId) {
+    const id = parseId(descuentoId);
+    const parsed = anularDescuentoSchema.safeParse(data);
+
+    if (!parsed.success) {
+      throw new AppError(
+        parsed.error.issues[0]?.message || "Datos invalidos.",
+        400,
+        "VALIDATION_ERROR"
+      );
+    }
+
+    if (!anuladoPorId) {
+      throw new AppError("No se pudo identificar al usuario que anula el descuento.", 401, "UNAUTHORIZED");
+    }
+
+    try {
+      return await SueldosRepository.anularDescuento(id, parsed.data, anuladoPorId);
+    } catch (err) {
+      const status = err.message === "Descuento no encontrado." ? 404 : 400;
+      throw new AppError(err.message, status, "DESCUENTO_ANULACION_ERROR");
     }
   },
 

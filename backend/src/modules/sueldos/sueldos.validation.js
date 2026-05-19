@@ -41,6 +41,29 @@ const adelantoSchema = z.object({
   metodo_pago: metodoPagoSchema,
 });
 
+const descuentoSchema = z.object({
+  tipo: z.enum(["falta", "tardanza"]),
+  fecha: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha invalida")
+    .optional(),
+  cantidad: z.coerce.number().positive("La cantidad debe ser mayor a cero"),
+  horas_jornada: z.coerce.number().positive("Las horas de jornada deben ser mayores a cero").nullable().optional(),
+  motivo: z.string().trim().max(500).nullable().optional(),
+}).superRefine((data, ctx) => {
+  if (data.tipo === "tardanza" && !data.horas_jornada) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["horas_jornada"],
+      message: "Indica las horas de la jornada para calcular la tardanza.",
+    });
+  }
+});
+
+const anularDescuentoSchema = z.object({
+  motivo: z.string().trim().min(3, "Describe brevemente el motivo de anulacion").max(500),
+});
+
 const anularAdelantoSchema = z.object({
   motivo: z.string().trim().min(3, "Describe brevemente el motivo de anulacion").max(500),
 });
@@ -55,6 +78,8 @@ module.exports = {
   abrirPeriodoSchema,
   actualizarPeriodoSchema,
   adelantoSchema,
+  descuentoSchema,
   anularAdelantoSchema,
+  anularDescuentoSchema,
   historialSchema,
 };

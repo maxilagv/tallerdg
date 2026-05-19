@@ -106,6 +106,7 @@ const FinanzasRepository = {
       pagosProveedoresEfectivo,
       pagosProveedoresEfectivoArrastre,
       deudaProveedores,
+      deudaProveedoresInactivos,
       ventasRapidas,
       ventasRapidasPorMetodo,
       ventasRapidasEfectivo,
@@ -255,9 +256,23 @@ const FinanzasRepository = {
         .select(db.raw("COALESCE(SUM(m.monto), 0) as total"))
         .first(),
 
-      db("cuentas_corrientes_proveedores")
-        .where("activa", 1)
-        .select(db.raw("COALESCE(SUM(CASE WHEN saldo > 0 THEN saldo ELSE 0 END), 0) as total"))
+      db("cuentas_corrientes_proveedores as cc")
+        .join("proveedores as p", "p.id", "cc.proveedor_id")
+        .where("cc.activa", 1)
+        .where("p.activo", 1)
+        .select(
+          db.raw("COALESCE(SUM(CASE WHEN cc.saldo > 0 THEN cc.saldo ELSE 0 END), 0) as total"),
+          db.raw("COALESCE(SUM(CASE WHEN cc.saldo < 0 THEN cc.saldo ELSE 0 END), 0) as saldo_a_favor")
+        )
+        .first(),
+
+      db("cuentas_corrientes_proveedores as cc")
+        .leftJoin("proveedores as p", "p.id", "cc.proveedor_id")
+        .where("cc.activa", 1)
+        .where(function onlyInactiveProviders() {
+          this.whereNull("p.id").orWhere("p.activo", 0);
+        })
+        .select(db.raw("COALESCE(SUM(CASE WHEN cc.saldo > 0 THEN cc.saldo ELSE 0 END), 0) as total"))
         .first(),
 
       // Ventas rápidas (caja rápida — ingresos sin orden de trabajo)
@@ -338,6 +353,8 @@ const FinanzasRepository = {
     const totalPagosProveedoresEfectivo = Number(pagosProveedoresEfectivo?.total) || 0;
     const totalPagosProveedoresEfectivoArrastre = Number(pagosProveedoresEfectivoArrastre?.total) || 0;
     const deudaProveedoresTotal = Number(deudaProveedores?.total)   || 0;
+    const saldoFavorProveedores = Number(deudaProveedores?.saldo_a_favor) || 0;
+    const deudaProveedoresInactivosTotal = Number(deudaProveedoresInactivos?.total) || 0;
     const totalCompras         = totalComprasCaja + totalPagosProveedores;
     const totalAportes         = Number(titular?.aportes)           || 0;
     const totalRetiros         = Number(titular?.retiros)           || 0;
@@ -420,6 +437,9 @@ const FinanzasRepository = {
       cantidad_pagos_proveedores: Number(pagosProveedores?.cantidad) || 0,
       cantidad_ventas_rapidas: Number(ventasRapidas?.cantidad)       || 0,
       deuda_proveedores_total: deudaProveedoresTotal,
+      deuda_proveedores_inactivos_excluida: deudaProveedoresInactivosTotal,
+      saldo_favor_proveedores_total: Math.abs(saldoFavorProveedores),
+      saldo_neto_proveedores: deudaProveedoresTotal + saldoFavorProveedores,
       // ── Desgloses ─────────────────────────────────────────────────────────
       desglose_metodos: cobrosPorMetodo.map((item) => ({
         metodo: item.metodo,

@@ -11,7 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { metodoPagoLabels } from "../../features/pagos/api";
-import { sueldosApi, periodoPagoLabel, type Adelanto, type EmpleadoResumen } from "../../features/sueldos/api";
+import { sueldosApi, periodoPagoLabel, type Adelanto, type DescuentoSueldo, type EmpleadoResumen } from "../../features/sueldos/api";
 import { Button } from "../../shared/ui/Button";
 import { Card } from "../../shared/ui/Card";
 import { EmptyState } from "../../shared/ui/EmptyState";
@@ -21,6 +21,8 @@ import { getErrorMessage } from "../../shared/utils/errorMessage";
 import { formatDate, formatMoney, toLocalDateInputValue } from "../../shared/utils/format";
 import { AdelantoModal } from "./AdelantoModal";
 import { AnularAdelantoModal } from "./AnularAdelantoModal";
+import { AnularDescuentoModal } from "./AnularDescuentoModal";
+import { DescuentoModal } from "./DescuentoModal";
 import { LiquidarModal } from "./LiquidarModal";
 import { PeriodoSueldoModal } from "./PeriodoSueldoModal";
 import { SueldoConfigModal } from "./SueldoConfigModal";
@@ -29,7 +31,9 @@ type ModalState =
   | { type: "config"; emp: EmpleadoResumen }
   | { type: "periodo"; emp: EmpleadoResumen }
   | { type: "adelanto"; emp: EmpleadoResumen }
+  | { type: "descuento"; emp: EmpleadoResumen }
   | { type: "anular-adelanto"; emp: EmpleadoResumen; adelanto: Adelanto }
+  | { type: "anular-descuento"; emp: EmpleadoResumen; descuento: DescuentoSueldo }
   | { type: "liquidar"; emp: EmpleadoResumen }
   | null;
 
@@ -45,6 +49,7 @@ export function SueldosPage() {
   const [modal, setModal] = useState<ModalState>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [adelantosExpandedIds, setAdelantosExpandedIds] = useState<number[]>([]);
+  const [descuentosExpandedIds, setDescuentosExpandedIds] = useState<number[]>([]);
   const [fechaInicio, setFechaInicio] = useState(toLocalDateInputValue());
 
   const query = useQuery({
@@ -103,6 +108,7 @@ export function SueldosPage() {
               emp={emp}
               expanded={expandedId === emp.id}
               adelantosExpanded={adelantosExpandedIds.includes(emp.id)}
+              descuentosExpanded={descuentosExpandedIds.includes(emp.id)}
               historial={expandedId === emp.id ? historialQuery.data?.data.data : undefined}
               historialLoading={expandedId === emp.id && historialQuery.isLoading}
               fechaInicio={fechaInicio}
@@ -113,10 +119,17 @@ export function SueldosPage() {
                   ids.includes(emp.id) ? ids.filter((id) => id !== emp.id) : [...ids, emp.id]
                 )
               }
+              onToggleDescuentos={() =>
+                setDescuentosExpandedIds((ids) =>
+                  ids.includes(emp.id) ? ids.filter((id) => id !== emp.id) : [...ids, emp.id]
+                )
+              }
               onConfig={() => setModal({ type: "config", emp })}
               onEditarPeriodo={() => setModal({ type: "periodo", emp })}
               onAdelanto={() => setModal({ type: "adelanto", emp })}
+              onDescuento={() => setModal({ type: "descuento", emp })}
               onAnularAdelanto={(adelanto) => setModal({ type: "anular-adelanto", emp, adelanto })}
+              onAnularDescuento={(descuento) => setModal({ type: "anular-descuento", emp, descuento })}
               onLiquidar={() => setModal({ type: "liquidar", emp })}
               onAbrirPeriodo={async () => {
                 try {
@@ -167,6 +180,24 @@ export function SueldosPage() {
         />
       )}
 
+      {modal?.type === "descuento" && modal.emp.periodo_actual && (
+        <DescuentoModal
+          open
+          onClose={closeModal}
+          onSuccess={refresh}
+          periodoId={modal.emp.periodo_actual.id}
+          empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
+          sueldoPeriodo={Number(modal.emp.periodo_actual.sueldo_base)}
+          fechaInicio={modal.emp.periodo_actual.fecha_inicio}
+          fechaFin={modal.emp.periodo_actual.fecha_fin}
+          saldoDisponible={
+            Number(modal.emp.periodo_actual.sueldo_base) -
+            (modal.emp.periodo_actual.total_adelantos ?? 0) -
+            (modal.emp.periodo_actual.total_descuentos ?? 0)
+          }
+        />
+      )}
+
       {modal?.type === "liquidar" && modal.emp.periodo_actual && (
         <LiquidarModal
           open
@@ -186,6 +217,16 @@ export function SueldosPage() {
           empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
         />
       )}
+
+      {modal?.type === "anular-descuento" && (
+        <AnularDescuentoModal
+          open
+          onClose={closeModal}
+          onSuccess={refresh}
+          descuento={modal.descuento}
+          empleadoNombre={`${modal.emp.nombre} ${modal.emp.apellido}`}
+        />
+      )}
     </div>
   );
 }
@@ -194,16 +235,20 @@ interface EmpleadoCardProps {
   emp: EmpleadoResumen;
   expanded: boolean;
   adelantosExpanded: boolean;
+  descuentosExpanded: boolean;
   historial: { rows: any[]; total: number } | undefined;
   historialLoading: boolean;
   fechaInicio: string;
   onFechaInicio: (value: string) => void;
   onToggleExpand: () => void;
   onToggleAdelantos: () => void;
+  onToggleDescuentos: () => void;
   onConfig: () => void;
   onEditarPeriodo: () => void;
   onAdelanto: () => void;
+  onDescuento: () => void;
   onAnularAdelanto: (adelanto: Adelanto) => void;
+  onAnularDescuento: (descuento: DescuentoSueldo) => void;
   onLiquidar: () => void;
   onAbrirPeriodo: () => void;
 }
@@ -212,16 +257,20 @@ function EmpleadoCard({
   emp,
   expanded,
   adelantosExpanded,
+  descuentosExpanded,
   historial,
   historialLoading,
   fechaInicio,
   onFechaInicio,
   onToggleExpand,
   onToggleAdelantos,
+  onToggleDescuentos,
   onConfig,
   onEditarPeriodo,
   onAdelanto,
+  onDescuento,
   onAnularAdelanto,
+  onAnularDescuento,
   onLiquidar,
   onAbrirPeriodo,
 }: EmpleadoCardProps) {
@@ -231,11 +280,12 @@ function EmpleadoCard({
   const vencido = periodo && periodo.fecha_fin < hoy;
 
   const adelantos = periodo?.total_adelantos ?? 0;
+  const descuentos = periodo?.total_descuentos ?? 0;
   const sueldoPeriodo = periodo
     ? Number(periodo.sueldo_base)
     : calcularMontoPeriodo(Number(config?.sueldo_base ?? 0), config?.periodo_pago);
-  const saldoRestante = sueldoPeriodo - adelantos;
-  const pct = sueldoPeriodo > 0 ? Math.min((adelantos / sueldoPeriodo) * 100, 100) : 0;
+  const saldoRestante = sueldoPeriodo - adelantos - descuentos;
+  const pct = sueldoPeriodo > 0 ? Math.min(((adelantos + descuentos) / sueldoPeriodo) * 100, 100) : 0;
 
   return (
     <Card padding={false}>
@@ -289,6 +339,9 @@ function EmpleadoCard({
               <Button variant="secondary" size="sm" onClick={onAdelanto}>
                 + Adelanto
               </Button>
+              <Button variant="secondary" size="sm" onClick={onDescuento}>
+                - Descuento
+              </Button>
               <Button size="sm" onClick={onLiquidar}>
                 Liquidar
               </Button>
@@ -321,6 +374,12 @@ function EmpleadoCard({
             </span>
             <span>
               Adelantos: <strong className="text-red-300">{formatMoney(adelantos)}</strong>
+              {descuentos > 0 ? (
+                <>
+                  {" - "}
+                  Descuentos: <strong className="text-red-300">{formatMoney(descuentos)}</strong>
+                </>
+              ) : null}
               {" / "}
               <strong className="text-text">{formatMoney(sueldoPeriodo)}</strong>
             </span>
@@ -397,6 +456,63 @@ function EmpleadoCard({
               ) : null}
             </div>
           ) : null}
+
+          {periodo.descuentos?.length ? (
+            <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface-2">
+              <button
+                type="button"
+                onClick={onToggleDescuentos}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-surface-3"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-text">Detalle de descuentos</p>
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    {periodo.descuentos.length} descuento{periodo.descuentos.length !== 1 ? "s" : ""} registrados
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-red-300">{formatMoney(descuentos)}</span>
+                  {descuentosExpanded ? (
+                    <ChevronUp size={18} className="text-text-muted" />
+                  ) : (
+                    <ChevronDown size={18} className="text-text-muted" />
+                  )}
+                </div>
+              </button>
+
+              {descuentosExpanded ? (
+                <div className="border-t border-border">
+                  {periodo.descuentos.map((descuento) => (
+                    <div
+                      key={descuento.id}
+                      className="flex flex-col justify-between gap-3 border-b border-border/50 px-4 py-3 last:border-b-0 sm:flex-row sm:items-center"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-red-300">
+                            {formatMoney(descuento.monto)}
+                          </span>
+                          <span className="rounded-full bg-surface-3 px-2 py-0.5 text-[10px] text-text-muted">
+                            {descuento.tipo === "falta" ? "Falta" : "Tardanza"}
+                          </span>
+                          <span className="text-xs text-text-muted">{formatDate(descuento.fecha)}</span>
+                        </div>
+                        <p className="mt-1 truncate text-xs text-text-muted">
+                          {descuento.tipo === "falta"
+                            ? `${Number(descuento.cantidad).toLocaleString("es-AR")} dia(s)`
+                            : `${Number(descuento.cantidad).toLocaleString("es-AR")} hora(s) - jornada ${Number(descuento.horas_jornada || 0).toLocaleString("es-AR")} hs`}
+                          {descuento.motivo ? ` - ${descuento.motivo}` : ""}
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => onAnularDescuento(descuento)}>
+                        <Ban size={14} /> Anular
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -420,11 +536,13 @@ function EmpleadoCard({
                     </span>
                     <span className="ml-3 text-xs text-text-muted">
                       Adelantos: {formatMoney(periodoItem.total_adelantos)}
+                      {(periodoItem.total_descuentos ?? 0) > 0 &&
+                        ` - Descuentos: ${formatMoney(periodoItem.total_descuentos)}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-text">
-                      {formatMoney(Number(periodoItem.sueldo_base) - periodoItem.total_adelantos)}
+                      {formatMoney(Number(periodoItem.sueldo_base) - periodoItem.total_adelantos - (periodoItem.total_descuentos ?? 0))}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${

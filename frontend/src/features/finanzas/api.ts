@@ -51,6 +51,9 @@ export interface FinanzasResumen {
   cantidad_pagos_proveedores: number;
   cantidad_ventas_rapidas: number;
   deuda_proveedores_total: number;
+  deuda_proveedores_inactivos_excluida: number;
+  saldo_favor_proveedores_total: number;
+  saldo_neto_proveedores: number;
   // Desgloses por método de pago
   desglose_metodos:    Array<{ metodo: MetodoPago; total: number }>;
   desglose_metodos_vr: Array<{ metodo: string;    total: number }>;

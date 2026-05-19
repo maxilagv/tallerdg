@@ -131,6 +131,15 @@ const VentasRapidasRepository = {
     return { ...venta, items };
   },
 
+  async actualizarMedioPago(id, medioPago) {
+    const updated = await db("ventas_rapidas")
+      .where({ id })
+      .update({ medio_pago: medioPago, updated_at: db.fn.now() });
+
+    if (!updated) return null;
+    return this.findById(id);
+  },
+
   async saldoCajaHoy() {
     const today = new Date().toISOString().slice(0, 10);
     const result = await db("ventas_rapidas")

@@ -24,6 +24,10 @@ const createVentaRapidaSchema = z.object({
     .min(1, "Debe incluir al menos un producto"),
 });
 
+const updateMedioPagoSchema = z.object({
+  medio_pago: z.enum(MEDIOS_PAGO, { errorMap: () => ({ message: "Metodo de pago invalido" }) }),
+});
+
 const listVentasRapidasSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -31,4 +35,4 @@ const listVentasRapidasSchema = z.object({
   hasta: z.string().optional(),
 });
 
-module.exports = { createVentaRapidaSchema, listVentasRapidasSchema, MEDIOS_PAGO };
+module.exports = { createVentaRapidaSchema, updateMedioPagoSchema, listVentasRapidasSchema, MEDIOS_PAGO };

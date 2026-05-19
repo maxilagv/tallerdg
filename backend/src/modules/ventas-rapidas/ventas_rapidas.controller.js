@@ -21,6 +21,15 @@ const VentasRapidasController = {
     return res.status(201).json({ ok: true, data });
   },
 
+  async actualizarMedioPago(req, res) {
+    const data = await VentasRapidasService.actualizarMedioPago(
+      req.params.id,
+      req.body,
+      req.ownerAuthorization
+    );
+    return res.json({ ok: true, data });
+  },
+
   async imprimirComprobante(req, res) {
     const { numero, pdfBuffer } = await VentasRapidasService.generarComprobante(req.params.id);
     res.setHeader("Content-Type", "application/pdf");

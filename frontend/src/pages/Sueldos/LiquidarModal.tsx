@@ -26,7 +26,8 @@ export function LiquidarModal({ open, onClose, onSuccess, periodo, empleadoNombr
   const [metodoPago, setMetodoPago] = useState<MetodoPago>(metodoPagoOptions[0].value);
 
   const adelantos = periodo.total_adelantos ?? 0;
-  const saldoRestante = Number(periodo.sueldo_base) - adelantos;
+  const descuentos = periodo.total_descuentos ?? 0;
+  const saldoRestante = Number(periodo.sueldo_base) - adelantos - descuentos;
 
   const handleClose = () => {
     setMetodoPago(metodoPagoOptions[0].value);
@@ -79,6 +80,7 @@ export function LiquidarModal({ open, onClose, onSuccess, periodo, empleadoNombr
           <Row label="Periodo" value={`${formatDate(periodo.fecha_inicio)} -> ${formatDate(periodo.fecha_fin)}`} />
           <Row label="Sueldo del periodo" value={formatMoney(periodo.sueldo_base)} />
           <Row label="Total adelantos" value={`- ${formatMoney(adelantos)}`} tone="red" />
+          <Row label="Total descuentos" value={`- ${formatMoney(descuentos)}`} tone="red" />
           <Row
             label="Saldo a pagar"
             value={formatMoney(Math.max(0, saldoRestante))}
